@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#1f6f54" />
+  <meta name="description" content="Scrabbled — an ad-free, turn-based word game with AI opponents, randomized boards, and an earn-by-playing store. Plays entirely in your browser." />
+  <title>Scrabbled — Word Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%23e9c46a'/><text x='50' y='72' font-size='64' text-anchor='middle' font-family='Georgia' fill='%23264653'>S</text></svg>" />
+</head>
+<body>
+  <!-- Loading overlay while the dictionary downloads -->
+  <div id="loading" class="overlay">
+    <div class="overlay-card">
+      <div class="logo-mark">S</div>
+      <h1>Scrabbled</h1>
+      <p class="muted">Loading the dictionary…</p>
+      <div class="spinner"></div>
+    </div>
+  </div>
+
+  <header class="topbar">
+    <div class="brand"><span class="logo-mark small">S</span> Scrabbled</div>
+    <div class="wallet">
+      <span class="coin" title="Coins">🪙 <b id="wallet-coins">0</b></span>
+      <span class="gem" title="Gems">💎 <b id="wallet-gems">0</b></span>
+      <button id="btn-new" class="btn btn-light">New Game</button>
+    </div>
+  </header>
+
+  <main id="app" class="app hidden">
+    <section class="board-area">
+      <div class="scoreboard" id="scoreboard"></div>
+      <div id="board" class="board" aria-label="Game board"></div>
+      <div class="bag-info"><span id="bag-count">100</span> tiles in bag</div>
+    </section>
+
+    <aside class="side">
+      <div class="rack-wrap">
+        <div id="rack" class="rack" aria-label="Your tiles"></div>
+        <div class="controls">
+          <button id="btn-play" class="btn btn-primary">Play</button>
+          <button id="btn-recall" class="btn">Recall</button>
+          <button id="btn-shuffle" class="btn">Shuffle</button>
+          <button id="btn-swap" class="btn">Swap</button>
+          <button id="btn-pass" class="btn">Pass</button>
+        </div>
+        <div id="message" class="message" role="status"></div>
+      </div>
+
+      <div class="history-wrap">
+        <h2>Move history</h2>
+        <ol id="history" class="history"></ol>
+      </div>
+    </aside>
+  </main>
+
+  <!-- New game dialog -->
+  <div id="new-dialog" class="overlay hidden">
+    <div class="overlay-card wide">
+      <h2>New Game</h2>
+      <div class="field">
+        <label>Opponent</label>
+        <div class="seg" id="opt-opponent">
+          <button data-val="ai" class="seg-btn active">Computer</button>
+          <button data-val="practice" class="seg-btn">Practice (solo)</button>
+          <button data-val="hotseat" class="seg-btn">Pass &amp; Play</button>
+        </div>
+      </div>
+      <div class="field" id="difficulty-field">
+        <label>Difficulty</label>
+        <div class="seg wrap" id="opt-difficulty"></div>
+        <p class="muted small" id="difficulty-blurb"></p>
+      </div>
+      <div class="field">
+        <label>Board</label>
+        <div class="seg" id="opt-mode">
+          <button data-val="standard" class="seg-btn active">Standard</button>
+          <button data-val="randomized" class="seg-btn">Randomized</button>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="btn-start" class="btn btn-primary">Start</button>
+        <button id="btn-cancel" class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Blank tile letter picker -->
+  <div id="blank-dialog" class="overlay hidden">
+    <div class="overlay-card">
+      <h2>Choose a letter</h2>
+      <div id="blank-grid" class="blank-grid"></div>
+    </div>
+  </div>
+
+  <!-- Swap dialog -->
+  <div id="swap-dialog" class="overlay hidden">
+    <div class="overlay-card">
+      <h2>Swap tiles</h2>
+      <p class="muted small">Tap tiles to exchange, then confirm.</p>
+      <div id="swap-rack" class="rack center"></div>
+      <div class="dialog-actions">
+        <button id="btn-swap-confirm" class="btn btn-primary">Swap</button>
+        <button id="btn-swap-cancel" class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game over -->
+  <div id="end-dialog" class="overlay hidden">
+    <div class="overlay-card">
+      <h2 id="end-title">Game over</h2>
+      <div id="end-body"></div>
+      <div class="dialog-actions">
+        <button id="btn-again" class="btn btn-primary">Play again</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="thinking" class="thinking hidden"><span class="spinner small"></span> Computer is thinking…</div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
