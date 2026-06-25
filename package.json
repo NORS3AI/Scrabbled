@@ -1,0 +1,16 @@
+{
+  "name": "scrabbled",
+  "version": "0.1.0",
+  "description": "An ad-free, async turn-based word game (Scrabble / Words With Friends style).",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:smoke": "node test/smoke.mjs"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "playwright": "^1.61.1"
+  }
+}
