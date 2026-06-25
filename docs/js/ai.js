@@ -261,21 +261,65 @@ function pickFromBand(sorted, lo, hi) {
   return sorted[Math.min(idx, sorted.length - 1)];
 }
 
+// Relative English letter frequencies (percent). Used to gauge how "common" a
+// word is so the easiest tiers favour everyday words.
+const LETTER_FREQ = {
+  e: 12.7, t: 9.1, a: 8.2, o: 7.5, i: 7.0, n: 6.7, s: 6.3, h: 6.1, r: 6.0,
+  d: 4.3, l: 4.0, c: 2.8, u: 2.8, m: 2.4, w: 2.4, f: 2.2, g: 2.0, y: 2.0,
+  p: 1.9, b: 1.5, v: 1.0, k: 0.8, j: 0.15, x: 0.15, q: 0.10, z: 0.07,
+};
+
+// The main word of a move (the one the player actually "spells").
+function mainWord(move) {
+  const w = move.words.find((x) => x.isMain) || move.words[0];
+  return w ? w.word : '';
+}
+
+// Higher = more everyday (short words made of frequent letters).
+function commonness(word) {
+  if (!word) return 0;
+  let sum = 0;
+  for (const ch of word) sum += LETTER_FREQ[ch] || 0;
+  return sum / word.length;
+}
+
+// Higher = harder/more obscure (longer words and rare, high-value letters).
+function rarity(word) {
+  if (!word) return 0;
+  let pts = 0;
+  for (const ch of word) pts += LETTER_POINTS[ch] || 0;
+  return pts + word.length * 1.5;
+}
+
 // Choose a move for the given difficulty. Returns a move object or null
-// (caller should then swap/pass). rack is the full rack (for leave evaluation).
+// (caller should then swap/pass).
+//   beginner     common 2-3 letter words
+//   easy         a random easy/short word
+//   intermediate middling scores
+//   advanced     strong scores
+//   expert       the highest-scoring play
+//   master       a strong play, biased toward the most difficult/obscure word
 export function chooseMove(board, rack, difficulty) {
   const moves = generateMoves(board, rack);
   if (moves.length === 0) return null;
-  const sorted = [...moves].sort((a, b) => a.score - b.score); // ascending
+  const sorted = [...moves].sort((a, b) => a.score - b.score); // ascending by score
 
   switch (difficulty) {
-    case 'beginner':
-      // Prefer short, low-value words; ignore the strongest plays entirely.
-      return pickFromBand(sorted.filter((m) => m.placement.length <= 4).length
-        ? sorted.filter((m) => m.placement.length <= 4)
-        : sorted, 0, 0.35);
+    case 'beginner': {
+      // Only short words (2-3 letters); among those, prefer the most common.
+      const newTiles = (m) => m.placement.length;
+      let pool = moves.filter((m) => mainWord(m).length <= 3 && newTiles(m) <= 3);
+      if (pool.length === 0) pool = moves.filter((m) => mainWord(m).length <= 4);
+      if (pool.length === 0) pool = sorted.slice(0, Math.max(1, Math.ceil(sorted.length * 0.25)));
+      // Rank by commonness, then pick randomly from the most common handful.
+      pool.sort((a, b) => commonness(mainWord(b)) - commonness(mainWord(a)));
+      const top = pool.slice(0, Math.max(1, Math.ceil(pool.length * 0.4)));
+      return top[Math.floor(Math.random() * top.length)];
+    }
     case 'easy':
-      return sorted[Math.floor(Math.random() * sorted.length)];
+      return pickFromBand(sorted.filter((m) => mainWord(m).length <= 4).length
+        ? sorted.filter((m) => mainWord(m).length <= 4)
+        : sorted, 0, 0.5);
     case 'intermediate':
       return pickFromBand(sorted, 0.35, 0.7);
     case 'advanced':
@@ -283,16 +327,33 @@ export function chooseMove(board, rack, difficulty) {
     case 'expert':
       return sorted[sorted.length - 1];
     case 'master': {
+      // Among the strongest-scoring plays, prefer the most difficult word.
+      const cutoff = sorted.length > 4
+        ? sorted[Math.floor(sorted.length * 0.7)].score
+        : sorted[0].score;
+      const strong = moves.filter((m) => m.score >= cutoff);
       let best = null;
       let bestVal = -Infinity;
-      for (const m of moves) {
-        const left = remainingRack(rack, m.placement);
-        const val = m.score + leaveValue(left) - exposurePenalty(board, m.placement);
+      for (const m of strong) {
+        // Reward difficulty and score; a small bonus for a good rack leave.
+        const val = rarity(mainWord(m)) * 3 + m.score
+          + leaveValue(remainingRack(rack, m.placement)) * 0.3
+          - exposurePenalty(board, m.placement);
         if (val > bestVal) { bestVal = val; best = m; }
       }
-      return best;
+      return best || sorted[sorted.length - 1];
     }
     default:
       return sorted[sorted.length - 1];
   }
+}
+
+// Best (highest-scoring) move for a rack — used by the dev panel hint.
+// Returns { move, word, score } or null.
+export function bestMove(board, rack) {
+  const moves = generateMoves(board, rack);
+  if (moves.length === 0) return null;
+  let best = moves[0];
+  for (const m of moves) if (m.score > best.score) best = m;
+  return { move: best, word: mainWord(best), score: best.score };
 }

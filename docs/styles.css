@@ -40,6 +40,17 @@ body {
 .brand { font-weight: 800; font-size: 1.25rem; letter-spacing: .5px; display: flex; align-items: center; gap: .5rem; }
 .wallet { display: flex; align-items: center; gap: .9rem; font-weight: 600; }
 .wallet .coin, .wallet .gem { background: rgba(255, 255, 255, .12); padding: .25rem .55rem; border-radius: 20px; font-size: .9rem; }
+.ver-badge {
+  background: rgba(255, 255, 255, .12); color: #fff; border: 1px solid rgba(255, 255, 255, .25);
+  padding: .22rem .5rem; border-radius: 20px; font-size: .72rem; font-weight: 600; cursor: pointer;
+}
+.ver-badge:hover { background: rgba(255, 255, 255, .22); }
+.notes-body { text-align: left; max-height: 60vh; overflow-y: auto; }
+.notes-entry { margin-bottom: 1rem; }
+.notes-entry h3 { margin: .2rem 0; font-size: 1.05rem; }
+.notes-entry .when { color: #6b7a83; font-size: .8rem; margin-bottom: .4rem; }
+.notes-entry ul { margin: .3rem 0; padding-left: 1.2rem; }
+.notes-entry li { margin-bottom: .3rem; }
 
 .logo-mark {
   display: grid; place-items: center; width: 64px; height: 64px; border-radius: 14px;
@@ -47,13 +58,21 @@ body {
 }
 .logo-mark.small { width: 28px; height: 28px; font-size: 1.1rem; border-radius: 7px; }
 
-/* Layout */
+/* Layout: full-height column with the tile dock pinned to the bottom. */
 .app {
-  display: grid; grid-template-columns: minmax(320px, 1fr) 340px; gap: 1.2rem;
-  max-width: 1200px; margin: 1rem auto; padding: 0 1rem; align-items: start;
+  display: flex; flex-direction: column;
+  height: calc(100dvh - 53px); /* viewport minus the top bar */
+  max-width: 1100px; margin: 0 auto; width: 100%;
 }
-.board-area { display: flex; flex-direction: column; align-items: center; gap: .6rem; }
-.scoreboard { display: flex; gap: .6rem; width: 100%; max-width: 640px; }
+.stage {
+  flex: 1; min-height: 0; display: flex; gap: 1rem;
+  padding: .6rem 1rem 0; justify-content: center; align-items: flex-start;
+}
+.board-area {
+  display: flex; flex-direction: column; align-items: center; gap: .5rem;
+  min-width: 0; min-height: 0; flex: 0 1 auto;
+}
+.scoreboard { display: flex; gap: .6rem; width: 100%; max-width: min(94vw, calc(100dvh - 300px), 520px); }
 .player-card {
   flex: 1; background: var(--paper); border-radius: 10px; padding: .5rem .7rem;
   display: flex; align-items: center; justify-content: space-between; box-shadow: var(--shadow);
@@ -66,7 +85,8 @@ body {
 
 /* Board */
 .board {
-  width: min(92vw, 640px); aspect-ratio: 1 / 1;
+  /* Smaller, and sized to fit between the scoreboard and the bottom dock. */
+  width: min(94vw, calc(100dvh - 300px), 520px); aspect-ratio: 1 / 1;
   display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr);
   gap: 2px; background: var(--board-line); padding: 4px; border-radius: 8px; box-shadow: var(--shadow);
 }
@@ -99,20 +119,25 @@ body {
 .tile.locked { cursor: default; }
 .tile.ghost { position: fixed; width: 40px; height: 40px; z-index: 50; pointer-events: none; opacity: .92; }
 
-/* Rack */
-.side { display: flex; flex-direction: column; gap: 1rem; }
-.rack-wrap { background: var(--paper); border-radius: 12px; padding: .8rem; box-shadow: var(--shadow); }
+/* Bottom dock: holds the tile rack + controls, pinned to the bottom. */
+.dock {
+  flex: 0 0 auto; background: var(--paper);
+  border-top: 1px solid var(--line); box-shadow: 0 -4px 14px rgba(0, 0, 0, .25);
+  padding: .55rem .8rem calc(.55rem + env(safe-area-inset-bottom));
+}
+.dock-inner { max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; gap: .5rem; }
 .rack {
-  display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
-  background: var(--felt-dark); padding: 8px; border-radius: 8px; min-height: 56px;
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px;
+  background: var(--felt-dark); padding: 6px; border-radius: 10px; min-height: 44px;
+  width: 100%; max-width: 348px; margin: 0 auto;
 }
 .rack.center { max-width: 340px; margin: .6rem auto; }
 .rack .slot { position: relative; aspect-ratio: 1 / 1; border-radius: 5px; background: rgba(0, 0, 0, .18); }
-.rack .slot .tile { position: absolute; inset: 0; }
+.rack .slot .tile { position: absolute; inset: 0; transition: transform .12s ease, box-shadow .12s ease; }
 .rack .slot.selected .tile { transform: translateY(-6px); box-shadow: 0 0 0 2px var(--accent), 0 4px 8px rgba(0, 0, 0, .35); }
 .rack .slot.swap-pick .tile { box-shadow: 0 0 0 3px var(--tw); }
 
-.controls { display: flex; gap: .4rem; margin-top: .7rem; flex-wrap: wrap; }
+.controls { display: flex; gap: .4rem; justify-content: center; flex-wrap: wrap; }
 .btn {
   border: 1px solid var(--line); background: #fff; color: var(--ink);
   padding: .5rem .8rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: .9rem;
@@ -122,18 +147,50 @@ body {
 .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
 .btn-primary:hover { background: var(--felt-dark); }
 .btn-light { background: var(--accent); border-color: var(--accent); color: #3a2c05; }
-.message { margin-top: .6rem; min-height: 1.2rem; font-weight: 600; }
+.btn-icon { padding: .4rem .6rem; font-size: 1rem; line-height: 1; }
+.btn-small { padding: .3rem .55rem; font-size: .8rem; }
+
+/* Developer panel (in the dock, above the message line) */
+.dev-panel { background: #fff7e0; border: 1px dashed var(--tile-edge); border-radius: 8px; padding: .4rem .55rem; }
+.dev-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.dev-tag { font-size: .65rem; font-weight: 800; color: #fff; background: #b23b2e; padding: .1rem .35rem; border-radius: 4px; letter-spacing: .5px; }
+.best-result { font-weight: 700; color: var(--ink); }
+
+/* Settings checkbox row */
+.check-row { display: flex; gap: .7rem; align-items: flex-start; text-align: left; cursor: pointer; margin: 1rem 0; }
+.check-row input { width: 20px; height: 20px; margin-top: .15rem; flex: 0 0 auto; }
+.check-row small { display: block; margin-top: .15rem; }
+
+/* Best-word hint highlight on the board */
+.cell.hint { outline: 3px solid #b23b2e; outline-offset: -3px; z-index: 2; }
+.cell .hint-letter { color: #b23b2e; font-weight: 800; opacity: .85; font-size: clamp(.6rem, 2.4vw, 1.1rem); }
+.message { min-height: 1.2rem; font-weight: 600; text-align: center; }
 .message.error { color: #c0392b; }
 .message.ok { color: var(--primary); }
 
-/* History */
-.history-wrap { background: var(--paper); border-radius: 12px; padding: .8rem 1rem; box-shadow: var(--shadow); }
+/* History (desktop sidebar) */
+.history-wrap {
+  background: var(--paper); border-radius: 12px; padding: .8rem 1rem; box-shadow: var(--shadow);
+  width: 280px; flex: 0 0 280px; max-height: 100%; overflow: hidden;
+  display: flex; flex-direction: column;
+}
 .history-wrap h2 { margin: .2rem 0 .6rem; font-size: 1rem; }
-.history { margin: 0; padding-left: 1.2rem; max-height: 320px; overflow-y: auto; font-size: .9rem; }
+.history { margin: 0; padding-left: 1.2rem; overflow-y: auto; font-size: .9rem; }
 .history li { margin-bottom: .35rem; }
 .history .hl-word { font-weight: 700; }
 .history .hl-pts { color: var(--primary); font-weight: 700; }
-.bag-info { color: rgba(255, 255, 255, .85); font-size: .85rem; }
+.bag-info { color: rgba(255, 255, 255, .85); font-size: .8rem; }
+
+/* Tile placement animation (used when the computer plays, one tile at a time) */
+@keyframes dropIn {
+  0% { transform: scale(1.35) translateY(-10px); opacity: 0; }
+  60% { transform: scale(.94); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.cell .tile.placing { animation: dropIn .26s cubic-bezier(.2, .8, .3, 1.2); z-index: 3; }
+@media (prefers-reduced-motion: reduce) {
+  .cell .tile.placing { animation: none; }
+}
 
 /* Overlays / dialogs */
 .overlay { position: fixed; inset: 0; background: rgba(8, 20, 16, .72); display: grid; place-items: center; z-index: 20; padding: 1rem; }
@@ -155,16 +212,23 @@ body {
 .spinner { width: 34px; height: 34px; border: 4px solid rgba(0, 0, 0, .15); border-top-color: var(--primary); border-radius: 50%; margin: 1rem auto 0; animation: spin 1s linear infinite; }
 .spinner.small { width: 16px; height: 16px; border-width: 3px; margin: 0; display: inline-block; vertical-align: middle; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.thinking { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, .8); color: #fff; padding: .5rem 1rem; border-radius: 20px; z-index: 15; font-size: .9rem; }
+.thinking { position: fixed; bottom: 172px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, .8); color: #fff; padding: .5rem 1rem; border-radius: 20px; z-index: 15; font-size: .9rem; }
 
-/* Responsive */
-@media (max-width: 880px) {
-  .app { grid-template-columns: 1fr; }
-  .side { order: 2; }
-  .board { width: min(96vw, 560px); }
+/* Responsive — hide the history sidebar on tablet/phone; the dock stays. */
+@media (max-width: 900px) {
   .history-wrap { display: none; }
+  .stage { padding: .5rem .5rem 0; }
 }
-@media (max-width: 420px) {
-  .controls .btn { flex: 1 1 28%; padding: .5rem .3rem; }
+@media (max-width: 480px) {
+  .controls { gap: .35rem; }
+  .controls .btn { flex: 1 1 30%; padding: .55rem .3rem; font-size: .85rem; }
+  .wallet { gap: .5rem; }
+  .wallet .coin, .wallet .gem { padding: .2rem .4rem; font-size: .82rem; }
   .wallet .btn { padding: .4rem .6rem; }
+  .brand { font-size: 1.1rem; }
+}
+/* Landscape phones / short screens: shrink board so the dock stays visible. */
+@media (max-height: 560px) {
+  .board { width: min(70vh, 94vw); }
+  .scoreboard { max-width: min(70vh, 94vw); }
 }
