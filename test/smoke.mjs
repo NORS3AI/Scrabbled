@@ -121,6 +121,44 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.cell .tile.hint').length >= 1, { timeout: 8000 });
   console.log('OK: used Hint power-up (best word highlighted)');
 
+  // Dev mode: auto-place the best word on the board.
+  await page.click('#btn-settings');
+  await page.click('#set-dev');
+  await page.click('#btn-settings-close');
+  await page.click('#btn-best');
+  await page.waitForFunction(() => /pts/.test(document.querySelector('#best-result').textContent), { timeout: 8000 });
+  await page.click('#btn-place-best');
+  await page.waitForFunction(() => document.querySelectorAll('#board .tile.pending').length >= 2, { timeout: 8000 });
+  console.log('OK: dev "Place on board" placed the best word');
+  await page.click('#btn-recall');
+
+  // Stats panel renders cells.
+  await page.click('#btn-stats');
+  await page.waitForSelector('#stats-dialog:not(.hidden)');
+  const statCells = await page.$$eval('#stats-body .stat-cell', (els) => els.length);
+  if (statCells < 5) fail(`stats panel sparse (${statCells} cells)`); else console.log('OK: stats panel renders');
+  await page.click('#btn-stats-close');
+
+  // History toggle changes the column's visibility.
+  const histVisible = () => page.$eval('.history-wrap', (el) => getComputedStyle(el).display !== 'none');
+  const histBefore = await histVisible();
+  await page.click('#btn-history');
+  const histAfter = await histVisible();
+  if (histBefore === histAfter) fail('history toggle did not change visibility'); else console.log('OK: history toggle works');
+  await page.click('#btn-history'); // restore
+
+  // Drag a rack tile across the board and confirm no ghost artifact remains.
+  const tBox = await page.$eval('#rack .slot[data-rack-index="0"] .tile', (el) => { const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  const cBox = await page.$eval('#board .cell[data-row="7"][data-col="7"]', (el) => { const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  await page.mouse.move(tBox.x, tBox.y);
+  await page.mouse.down();
+  await page.mouse.move((tBox.x + cBox.x) / 2, (tBox.y + cBox.y) / 2, { steps: 5 });
+  await page.mouse.move(cBox.x, cBox.y, { steps: 5 });
+  await page.mouse.up();
+  const ghosts = await page.$$eval('.tile.ghost', (els) => els.length);
+  if (ghosts !== 0) fail(`drag left ${ghosts} ghost artifact(s)`); else console.log('OK: drag leaves no ghost artifact');
+  await page.click('#btn-recall');
+
   // Pass the turn so the computer plays; it should drop tiles on the board.
   await page.click('#btn-pass');
   await page.waitForFunction(() => document.querySelectorAll('#board .tile.locked').length >= 2, { timeout: 15000 });

@@ -2,9 +2,22 @@
 // top entry's version makes the "What's new" dialog pop once for returning
 // players. Keep entries short and player-facing.
 
-export const VERSION = 'v0.0.2-alpha';
+export const VERSION = 'v0.0.3-alpha';
 
 export const PATCH_NOTES = [
+  {
+    version: 'v0.0.3-alpha',
+    date: '2026-06-25',
+    title: 'Stats, history panel & polish',
+    changes: [
+      'New Stats panel (📊): games, win rate, scores, words, bingos, tiles, blanks, best/longest words and a per-letter breakdown.',
+      'Move history is now a collapsible panel on the right (tablet/desktop) — toggle it with 📜 or the Hide button.',
+      'Dev panel gained a "Place on board" button that auto-fills the best word as tiles, ready to play.',
+      'The score preview now lists every word you form — the main word and any crosswords — each with its own points.',
+      'Gem rewards pop under your gem counter when earned; gems, achievements and stats are saved on your device.',
+      'Fixed a drag artifact that could leave a stuck tile on screen, and locked the page so it no longer scrolls during play.',
+    ],
+  },
   {
     version: 'v0.0.2-alpha',
     date: '2026-06-25',

@@ -24,11 +24,13 @@
   <header class="topbar">
     <div class="brand"><span class="logo-mark small">S</span> Scrabbled</div>
     <div class="wallet">
-      <button id="btn-notes" class="ver-badge" title="Patch notes">v0.0.2-alpha</button>
+      <button id="btn-notes" class="ver-badge" title="Patch notes">v0.0.3-alpha</button>
       <span class="coin" title="Coins">🪙 <b id="wallet-coins">0</b></span>
-      <span class="gem" title="Gems">💎 <b id="wallet-gems">0</b></span>
+      <span class="gem" title="Gems">💎 <b id="wallet-gems">0</b><span id="gem-gain" class="gem-gain"></span></span>
       <button id="btn-achievements" class="btn btn-icon ach-btn" title="Achievements" aria-label="Achievements">🏆<span id="ach-badge" class="badge hidden">0</span></button>
       <button id="btn-shop" class="btn btn-icon" title="Shop" aria-label="Shop">🛒</button>
+      <button id="btn-stats" class="btn btn-icon" title="Stats" aria-label="Stats">📊</button>
+      <button id="btn-history" class="btn btn-icon hist-toggle" title="Toggle history" aria-label="Toggle history">📜</button>
       <button id="btn-settings" class="btn btn-icon" title="Settings" aria-label="Settings">⚙</button>
       <button id="btn-new" class="btn btn-light">New Game</button>
     </div>
@@ -43,7 +45,10 @@
       </section>
 
       <aside class="history-wrap">
-        <h2>Move history</h2>
+        <div class="history-head">
+          <h2>Move history</h2>
+          <button id="btn-history-collapse" class="btn btn-small" title="Hide history">Hide ›</button>
+        </div>
         <ol id="history" class="history"></ol>
       </aside>
     </div>
@@ -54,6 +59,7 @@
           <div class="dev-row">
             <span class="dev-tag">DEV</span>
             <button id="btn-best" class="btn btn-small">Best word</button>
+            <button id="btn-place-best" class="btn btn-small">Place on board</button>
             <span id="best-result" class="best-result">—</span>
           </div>
         </div>
@@ -161,6 +167,17 @@
       <div id="shop-body" class="shop-body"></div>
       <div class="dialog-actions">
         <button id="btn-shop-close" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div id="stats-dialog" class="overlay hidden">
+    <div class="overlay-card wide">
+      <h2>Your stats</h2>
+      <div id="stats-body" class="stats-body"></div>
+      <div class="dialog-actions">
+        <button id="btn-stats-close" class="btn">Close</button>
       </div>
     </div>
   </div>
