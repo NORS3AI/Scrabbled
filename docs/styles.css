@@ -154,8 +154,14 @@ body { display: flex; flex-direction: column; }
 .tile.blank .lt { color: #b23b2e; }
 .tile.pending { box-shadow: 0 0 0 2px var(--accent), 0 2px 4px rgba(0, 0, 0, .3); }
 .tile.locked { cursor: default; }
-/* The tiles the computer just played, highlighted gold until you move. */
-.tile.lastmove { box-shadow: 0 0 0 2px var(--accent), 0 0 8px 2px rgba(233, 185, 73, .85); z-index: 2; }
+/* Most-recent move — a vivid amber so it's clearly visible even when the tiles
+   themselves are gold (the default theme) or any other theme colour. */
+.tile.lastmove {
+  background: linear-gradient(180deg, #ffd83a, #ffb400);
+  color: #3a2600; border-color: #a86a00;
+  box-shadow: 0 0 0 2px #a86a00, 0 0 10px 3px rgba(255, 180, 0, .9); z-index: 3;
+}
+.tile.lastmove .pv { opacity: .9; }
 .tile.ghost { position: fixed; inset: auto; width: 40px; height: 40px; z-index: 50; pointer-events: none; opacity: .92; }
 
 /* Bottom dock: rack on top, then an action bar (status + buttons). */

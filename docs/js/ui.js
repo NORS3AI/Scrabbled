@@ -555,31 +555,39 @@ function livePreview() {
     const s = scoreMove(game.board, pending, v.words);
     const parts = s.breakdown.map((b) => `${b.word.toUpperCase()} ${b.score}`).join(' + ');
     const plus = s.breakdown.length > 1 ? `${parts} = ` : '';
-    let msg = `${plus}${s.score}${s.bingo ? ' +50 bingo!' : ''}`;
+    const base = `${plus}${s.score}${s.bingo ? ' +50 bingo!' : ''}`;
     if (settings.autoPlay && isHumanTurn() && !busy) {
-      scheduleAutoPlay();
-      msg += ' · auto-playing in 3s…';
+      scheduleAutoPlay(base); // counts down 3…2…1… in the message
+    } else {
+      message(base, 'ok');
     }
-    message(msg, 'ok');
   } else {
     message(v.error, '');
   }
 }
 
-// Auto-play (opt-in): 3s after a valid word is on the board, play it — unless
-// the player changes it first (every placement change reschedules/clears).
+// Auto-play (opt-in): a visible 3…2…1… countdown, then play it — unless the
+// player changes the placement first (every change reschedules/clears).
 function clearAutoPlay() {
-  if (autoPlayTimer) { clearTimeout(autoPlayTimer); autoPlayTimer = null; }
+  if (autoPlayTimer) { clearInterval(autoPlayTimer); clearTimeout(autoPlayTimer); autoPlayTimer = null; }
 }
 
-function scheduleAutoPlay() {
+function scheduleAutoPlay(base) {
   clearAutoPlay();
-  autoPlayTimer = setTimeout(() => {
-    autoPlayTimer = null;
-    if (!isHumanTurn() || busy || pending.length === 0) return;
-    const v = validateMove(game.board, pending.map((p) => ({ ...p })));
-    if (v.valid) commitPlay();
-  }, 3000);
+  let n = 3;
+  const show = (k) => message(`${base}  ·  auto-play ${k}…`, 'ok');
+  show(n);
+  autoPlayTimer = setInterval(() => {
+    if (!isHumanTurn() || busy || pending.length === 0) { clearAutoPlay(); return; }
+    n -= 1;
+    if (n <= 0) {
+      clearAutoPlay();
+      const v = validateMove(game.board, pending.map((p) => ({ ...p })));
+      if (v.valid) commitPlay();
+      return;
+    }
+    show(n); // 2… then 1…
+  }, 1000);
 }
 
 function commitPlay() {
@@ -1178,6 +1186,11 @@ function bindControls() {
     toast('Statistics deleted.');
   });
   $('btn-app-version').addEventListener('click', openNotes);
+  // Tapping the dimmed backdrop (outside the card) closes these dialogs.
+  ['ach-dialog', 'shop-dialog', 'settings-dialog', 'stats-dialog', 'powerups-dialog', 'notes-dialog'].forEach((id) => {
+    const o = $(id);
+    o.addEventListener('click', (e) => { if (e.target === o) o.classList.add('hidden'); });
+  });
   initHistoryPanel();
   $('btn-best').addEventListener('click', showBestWord);
   $('btn-powerups').addEventListener('click', openPowerups);

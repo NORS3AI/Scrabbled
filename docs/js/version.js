@@ -2,9 +2,20 @@
 // top entry's version makes the "What's new" dialog pop once for returning
 // players. Keep entries short and player-facing.
 
-export const VERSION = 'v0.0.10-alpha';
+export const VERSION = 'v0.0.11-alpha';
 
 export const PATCH_NOTES = [
+  {
+    version: 'v0.0.11-alpha',
+    date: '2026-06-25',
+    title: 'Countdown, brighter last-move, tap-to-close',
+    changes: [
+      'Auto-play now shows a visible 3…2…1… countdown.',
+      'The most recent move is highlighted in a bright amber so it\'s clearly visible even on gold tiles (and every theme).',
+      'Tapping outside the Achievements, Shop, or Settings window now closes it.',
+      'Hardened saving (re-flushes when the tab is hidden). Note: if your browser blocks site storage — e.g. iOS Safari "Block All Cookies", Private Browsing, or an in-app browser — coins/gems/achievements can\'t be saved across a refresh.',
+    ],
+  },
   {
     version: 'v0.0.10-alpha',
     date: '2026-06-25',
