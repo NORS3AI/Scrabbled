@@ -13,7 +13,9 @@ import {
   getSeenVersion, setSeenVersion, getSettings, setSettings,
   getAchievements, unlockAchievements, claimAchievement,
   getInventory, buyItem, useItem,
+  getThemes, buyTheme, selectTheme,
 } from './store.js';
+import { THEMES, THEME_BY_ID } from './themes.js';
 import {
   ACHIEVEMENTS, ACHIEVEMENT_BY_ID, ACHIEVEMENT_CATEGORIES,
   newTracker, evaluatePlay, evaluateGameEnd,
@@ -43,10 +45,37 @@ export function startUI() {
   bindControls();
   refreshWallet();
   updateAchBadge();
+  applyTheme();
   settings = getSettings();
   applySettings();
   // Show "What's new" once per release.
   if (getSeenVersion() !== VERSION) openNotes();
+}
+
+// ---------- Background themes ----------
+function applyTheme() {
+  const t = getThemes();
+  const theme = THEME_BY_ID[t.selected] || THEMES[0];
+  document.body.style.background = theme.bg;
+}
+
+function renderThemePicker() {
+  const t = getThemes();
+  const wrap = $('theme-picker');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  for (const theme of THEMES) {
+    if (!t.owned[theme.id]) continue; // only owned themes are selectable here
+    const btn = document.createElement('button');
+    btn.className = 'theme-btn' + (theme.id === t.selected ? ' active' : '');
+    btn.innerHTML = `<span class="theme-swatch" style="background:${theme.swatch}"></span>${escapeHtml(theme.name)}`;
+    btn.addEventListener('click', () => {
+      selectTheme(theme.id);
+      applyTheme();
+      renderThemePicker();
+    });
+    wrap.appendChild(btn);
+  }
 }
 
 // ---------- Settings & dev panel ----------
@@ -62,7 +91,7 @@ function toggleHistory() {
   applySettings();
 }
 
-function openSettings() { applySettings(); $('settings-dialog').classList.remove('hidden'); }
+function openSettings() { applySettings(); renderThemePicker(); $('settings-dialog').classList.remove('hidden'); }
 function closeSettings() { $('settings-dialog').classList.add('hidden'); }
 
 function clearHint() {
@@ -719,10 +748,18 @@ function claimAll() {
 function openShop() { renderShop(); $('shop-dialog').classList.remove('hidden'); }
 
 function renderShop() {
-  $('shop-gems').textContent = getWallet().gems;
+  const w = getWallet();
+  $('shop-gems').textContent = w.gems;
+  if ($('shop-coins')) $('shop-coins').textContent = w.coins;
   const inv = getInventory();
   const body = $('shop-body');
   body.innerHTML = '';
+
+  // Power-ups (gems).
+  const puHead = document.createElement('div');
+  puHead.className = 'shop-subhead';
+  puHead.textContent = 'Power-ups (gems)';
+  body.appendChild(puHead);
   for (const item of SHOP_ITEMS) {
     const owned = inv[item.id] || 0;
     const card = document.createElement('div');
@@ -736,8 +773,33 @@ function renderShop() {
       `<button class="btn btn-primary shop-buy" data-buy="${item.id}">💎${item.cost}</button>`;
     body.appendChild(card);
   }
+
+  // Backgrounds (coins).
+  const themes = getThemes();
+  const bgHead = document.createElement('div');
+  bgHead.className = 'shop-subhead';
+  bgHead.textContent = 'Backgrounds (coins)';
+  body.appendChild(bgHead);
+  for (const theme of THEMES) {
+    if (theme.cost === 0) continue; // standard is the free default
+    const ownedT = !!themes.owned[theme.id];
+    const card = document.createElement('div');
+    card.className = 'shop-card';
+    card.innerHTML =
+      `<span class="shop-swatch" style="background:${theme.bg}"></span>` +
+      `<div class="shop-info"><div class="shop-name">${escapeHtml(theme.name)}</div>` +
+      `<div class="shop-desc">Game background. Switch to it in Settings ⚙.</div></div>` +
+      (ownedT
+        ? '<button class="btn shop-buy" disabled>Owned</button>'
+        : `<button class="btn btn-light shop-buy" data-buytheme="${theme.id}">🪙${theme.cost}</button>`);
+    body.appendChild(card);
+  }
+
   body.querySelectorAll('[data-buy]').forEach((btn) => {
     btn.addEventListener('click', () => doBuy(btn.dataset.buy));
+  });
+  body.querySelectorAll('[data-buytheme]').forEach((btn) => {
+    btn.addEventListener('click', () => doBuyTheme(btn.dataset.buytheme));
   });
 }
 
@@ -749,6 +811,18 @@ function doBuy(id) {
     toast(`Bought ${item.name}. Use it from ⚡ Power-ups on your turn.`);
   } else {
     toast(`Not enough gems for ${item.name} (need 💎${item.cost}).`);
+  }
+}
+
+function doBuyTheme(id) {
+  const theme = THEME_BY_ID[id];
+  if (buyTheme(id, theme.cost)) {
+    refreshWallet();
+    renderShop();
+    renderThemePicker();
+    toast(`Bought ${theme.name}! Select it in Settings ⚙.`);
+  } else {
+    toast(`Not enough coins for ${theme.name} (need 🪙${theme.cost}).`);
   }
 }
 

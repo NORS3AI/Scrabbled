@@ -10,6 +10,7 @@ const SETTINGS_KEY = 'scrabbled.settings.v1';
 const DEFAULT_SETTINGS = { devPanel: false, historyOpen: true };
 const ACH_KEY = 'scrabbled.achievements.v1';
 const INV_KEY = 'scrabbled.inventory.v1';
+const THEMES_KEY = 'scrabbled.themes.v1';
 
 const DEFAULT_WALLET = { coins: 0, gems: 0 };
 const DEFAULT_STATS = {
@@ -22,9 +23,16 @@ const DEFAULT_STATS = {
   letterCounts: {},
 };
 
+// In-memory mirror of every stored key. This is the source of truth within a
+// session, so the game still works (dedup, claiming, etc.) even when
+// localStorage is unavailable or write-blocked — e.g. private/incognito mode,
+// blocked third-party storage, or quota errors. localStorage is best-effort
+// persistence on top of it.
+const memCache = new Map();
+
 function read(key, fallback) {
   try {
-    const raw = localStorage.getItem(key);
+    let raw = memCache.has(key) ? memCache.get(key) : localStorage.getItem(key);
     return raw ? { ...fallback, ...JSON.parse(raw) } : { ...fallback };
   } catch {
     return { ...fallback };
@@ -32,7 +40,9 @@ function read(key, fallback) {
 }
 
 function write(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
+  const serialized = JSON.stringify(value);
+  memCache.set(key, serialized); // always succeeds; keeps the session consistent
+  try { localStorage.setItem(key, serialized); } catch { /* persistence best-effort */ }
 }
 
 export function getWallet() { return read(WALLET_KEY, DEFAULT_WALLET); }
@@ -55,7 +65,13 @@ export function setSettings(patch) {
 }
 
 // --- Achievements: { unlocked: {id:true}, claimed: {id:true} } ---
-export function getAchievements() { return read(ACH_KEY, { unlocked: {}, claimed: {} }); }
+export function getAchievements() {
+  const a = read(ACH_KEY, { unlocked: {}, claimed: {} });
+  // Harden against legacy/corrupt data so unlock/claim never throw.
+  if (!a.unlocked || typeof a.unlocked !== 'object') a.unlocked = {};
+  if (!a.claimed || typeof a.claimed !== 'object') a.claimed = {};
+  return a;
+}
 
 // Mark ids as unlocked (met but not yet claimed). Returns the ids that were
 // newly unlocked this call.
@@ -100,6 +116,35 @@ export function useItem(id) {
   if (!inv[id] || inv[id] <= 0) return false;
   inv[id] -= 1;
   write(INV_KEY, inv);
+  return true;
+}
+
+// --- Background themes: { owned: {id:true}, selected: id } ---
+export function getThemes() {
+  const t = read(THEMES_KEY, { owned: { standard: true }, selected: 'standard' });
+  t.owned = t.owned || {};
+  t.owned.standard = true; // standard is always owned
+  if (!t.selected) t.selected = 'standard';
+  return t;
+}
+
+// Buy a theme with coins; returns true on success.
+export function buyTheme(id, cost) {
+  const w = getWallet();
+  if (w.coins < cost) return false;
+  addCurrency({ coins: -cost });
+  const t = getThemes();
+  t.owned[id] = true;
+  write(THEMES_KEY, t);
+  return true;
+}
+
+// Select an owned theme; returns true if owned.
+export function selectTheme(id) {
+  const t = getThemes();
+  if (!t.owned[id]) return false;
+  t.selected = id;
+  write(THEMES_KEY, t);
   return true;
 }
 

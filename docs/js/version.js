@@ -2,9 +2,20 @@
 // top entry's version makes the "What's new" dialog pop once for returning
 // players. Keep entries short and player-facing.
 
-export const VERSION = 'v0.0.4-alpha';
+export const VERSION = 'v0.0.5-alpha';
 
 export const PATCH_NOTES = [
+  {
+    version: 'v0.0.5-alpha',
+    date: '2026-06-25',
+    title: 'Layout polish & background themes',
+    changes: [
+      'The board now stays centered, with the scoreboard moved to its left so there\'s more room for the tiles.',
+      'The move-history log is more compact with a grey panel, and the bottom play area is slimmer and blends into the green background.',
+      'Shop: buy background themes with coins (Fiery Orange, Velvet Purple, Golden Yellow, Subtle Black, Elephant Grey, Ocean Blue, Skybright Cyan, Pastel Pink) — 5 coins each. Switch between owned themes in Settings ⚙.',
+      'Fix: achievements now keep working even if your browser blocks site storage (e.g. private mode) — they unlock once and stay claimable.',
+    ],
+  },
   {
     version: 'v0.0.4-alpha',
     date: '2026-06-25',
