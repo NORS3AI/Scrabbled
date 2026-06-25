@@ -8,6 +8,8 @@ const STATS_KEY = 'scrabbled.stats.v1';
 const SEEN_VERSION_KEY = 'scrabbled.seenVersion';
 const SETTINGS_KEY = 'scrabbled.settings.v1';
 const DEFAULT_SETTINGS = { devPanel: false };
+const ACH_KEY = 'scrabbled.achievements.v1';
+const INV_KEY = 'scrabbled.inventory.v1';
 
 const DEFAULT_WALLET = { coins: 0, gems: 0 };
 const DEFAULT_STATS = { games: 0, wins: 0, losses: 0, bestWord: null, bestWordScore: 0, totalScore: 0 };
@@ -42,6 +44,55 @@ export function setSettings(patch) {
   const s = { ...getSettings(), ...patch };
   write(SETTINGS_KEY, s);
   return s;
+}
+
+// --- Achievements: { unlocked: {id:true}, claimed: {id:true} } ---
+export function getAchievements() { return read(ACH_KEY, { unlocked: {}, claimed: {} }); }
+
+// Mark ids as unlocked (met but not yet claimed). Returns the ids that were
+// newly unlocked this call.
+export function unlockAchievements(ids) {
+  const a = getAchievements();
+  const fresh = [];
+  for (const id of ids) {
+    if (!a.unlocked[id]) { a.unlocked[id] = true; fresh.push(id); }
+  }
+  if (fresh.length) write(ACH_KEY, a);
+  return fresh;
+}
+
+// Claim one unlocked-but-unclaimed achievement; credits gems. Returns gems
+// awarded (0 if not claimable).
+export function claimAchievement(id, gems) {
+  const a = getAchievements();
+  if (!a.unlocked[id] || a.claimed[id]) return 0;
+  a.claimed[id] = true;
+  write(ACH_KEY, a);
+  addCurrency({ gems });
+  return gems;
+}
+
+// --- Inventory of power-ups: { id: count } ---
+export function getInventory() { return read(INV_KEY, {}); }
+
+// Buy one of an item if enough gems; returns true on success.
+export function buyItem(id, cost) {
+  const w = getWallet();
+  if (w.gems < cost) return false;
+  addCurrency({ gems: -cost });
+  const inv = getInventory();
+  inv[id] = (inv[id] || 0) + 1;
+  write(INV_KEY, inv);
+  return true;
+}
+
+// Consume one of an item; returns true if one was available.
+export function useItem(id) {
+  const inv = getInventory();
+  if (!inv[id] || inv[id] <= 0) return false;
+  inv[id] -= 1;
+  write(INV_KEY, inv);
+  return true;
 }
 
 export function addCurrency({ coins = 0, gems = 0 }) {

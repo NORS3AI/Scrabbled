@@ -167,6 +167,54 @@ body {
 .check-row input { width: 20px; height: 20px; margin-top: .15rem; flex: 0 0 auto; }
 .check-row small { display: block; margin-top: .15rem; }
 
+/* Achievement badge on the trophy button */
+.ach-btn { position: relative; }
+.badge {
+  position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px;
+  background: #e3603b; color: #fff; border-radius: 10px; font-size: .65rem;
+  font-weight: 800; display: grid; place-items: center; padding: 0 4px;
+}
+
+/* Shared dialog header row */
+.dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.dialog-head h2 { margin: 0; }
+.shop-gems { font-weight: 700; }
+
+/* Achievements list */
+.ach-body { text-align: left; max-height: 58vh; overflow-y: auto; margin-top: .6rem; }
+.ach-cat { font-size: .8rem; font-weight: 800; color: #6b7a83; text-transform: uppercase; letter-spacing: .5px; margin: .8rem 0 .35rem; }
+.ach-item { display: flex; align-items: center; gap: .6rem; padding: .45rem .2rem; border-bottom: 1px solid var(--line); }
+.ach-item .ach-name { flex: 1; font-weight: 600; }
+.ach-item.locked { opacity: .55; }
+.ach-item .ach-gems { font-weight: 700; color: #1f6f54; white-space: nowrap; }
+.ach-item .ach-state { font-size: .78rem; color: #6b7a83; white-space: nowrap; }
+.ach-item .tick { color: #1f6f54; font-weight: 800; }
+
+/* Shop / power-up cards */
+.shop-body { text-align: left; max-height: 58vh; overflow-y: auto; margin-top: .6rem; display: grid; gap: .5rem; }
+.shop-card { display: flex; align-items: center; gap: .7rem; border: 1px solid var(--line); border-radius: 10px; padding: .55rem .7rem; }
+.shop-card .shop-icon { font-size: 1.5rem; }
+.shop-card .shop-info { flex: 1; }
+.shop-card .shop-name { font-weight: 700; }
+.shop-card .shop-name .rarity { font-size: .7rem; font-weight: 700; color: #fff; background: #4895c9; border-radius: 8px; padding: .05rem .4rem; margin-left: .35rem; }
+.shop-card .shop-name .rarity.Uncommon { background: #1f9d55; }
+.shop-card .shop-name .rarity.Rare { background: #6c5ce7; }
+.shop-card .shop-name .rarity.Epic { background: #e3603b; }
+.shop-card .shop-desc { font-size: .82rem; color: #6b7a83; }
+.shop-card .shop-own { font-size: .75rem; color: #1f6f54; font-weight: 700; }
+.shop-card .shop-buy { white-space: nowrap; }
+
+/* Armed power-up banner in the dock */
+.armed-banner { background: #fff0d6; border: 1px solid var(--accent); border-radius: 8px; padding: .3rem .55rem; font-weight: 700; color: #7a5b12; text-align: center; font-size: .85rem; }
+
+/* Toast (achievement unlocked, etc.) */
+.toast {
+  position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
+  background: #21303b; color: #fff; padding: .6rem 1rem; border-radius: 10px;
+  z-index: 30; font-weight: 600; box-shadow: 0 6px 20px rgba(0, 0, 0, .35);
+  max-width: 90vw; text-align: center;
+}
+
 /* Best-word hint: a readable suggestion tile drawn on the board (dev panel). */
 .cell .tile.hint {
   background: linear-gradient(180deg, #ffe9b0, #ffd166);

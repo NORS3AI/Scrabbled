@@ -18,7 +18,7 @@ modes, and a gameplay-earned currency system.
 | 2.5 | Practice & AI opponents (6 tiers) | ✅ Done |
 | 3 | Notifications & UX | 🟡 Partial (local; needs backend for cross-device) |
 | 3.5 | Currency & progression | 🟡 Started (coins/gems wallet, local) |
-| 4 | Achievements & store | ⬜ Planned |
+| 4 | Achievements & store | 🟡 Done client-side (44 achievements + gem shop with usable power-ups) |
 | 4.5 | Polish & features | 🟡 Partial (chat/leaderboards need backend) |
 
 Legend: ✅ done · 🟡 in progress / partial · ⬜ not started
@@ -123,13 +123,18 @@ browser and Node.
 - ⬜ Streaks and richer earning rules.
 - ⬜ Server-side wallet so it follows the account across devices.
 
-## Phase 4 — Achievements & Store ⬜
+## Phase 4 — Achievements & Store 🟡 (client-side done)
 
-- ⬜ Achievement tracking ("win five in a row", "play a fifty-point word" — the
-  data needed for these is already recorded in `store.js` stats and per-game
-  history).
-- ⬜ Store: spend coins/gems on power-ups (hints, undo, tile swaps, board themes).
-- ⬜ Power-up balancing.
+- ✅ Achievement tracking: 44 achievements across word length, word scores,
+  single-game milestones, letter feats, and victories (`achievements.js`). They
+  unlock as you play; the player taps **Claim** to collect gems. Persisted in
+  `store.js`.
+- ✅ Store (`shop.js`): spend gems on power-ups priced 10–100 by rarity. They
+  **stack** and are used on your turn (⚡): Best-Word Hint, Free Swap, Fresh
+  Rack, Double Word, Triple Word, Extra Turn.
+- 🟡 Power-up balancing — initial pass; tune as play data comes in.
+- ⬜ Server-side achievements/inventory so they follow the account across
+  devices (backend phase).
 
 ## Phase 4.5 — Polish & Features 🟡
 

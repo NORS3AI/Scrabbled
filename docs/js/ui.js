@@ -3,7 +3,7 @@
 // drives the AI's turn, and shows dialogs. Talks to the engine via game.js.
 
 import { BOARD_SIZE, LETTER_POINTS, RACK_SIZE } from './constants.js';
-import { newGame, currentPlayer, submitPlay, swapTiles, passTurn } from './game.js';
+import { newGame, currentPlayer, submitPlay, swapTiles, passTurn, redrawRack } from './game.js';
 import { validateMove } from './validation.js';
 import { scoreMove } from './scoring.js';
 import { chooseMove, bestMove } from './ai.js';
@@ -11,7 +11,14 @@ import { DIFFICULTIES } from './ai.js';
 import {
   getWallet, addCurrency, recordGame, rewardForGame, getSeenVersion, setSeenVersion,
   getSettings, setSettings,
+  getAchievements, unlockAchievements, claimAchievement,
+  getInventory, buyItem, useItem,
 } from './store.js';
+import {
+  ACHIEVEMENTS, ACHIEVEMENT_BY_ID, ACHIEVEMENT_CATEGORIES,
+  newTracker, evaluatePlay, evaluateGameEnd,
+} from './achievements.js';
+import { SHOP_ITEMS, SHOP_BY_ID } from './shop.js';
 import { VERSION, PATCH_NOTES } from './version.js';
 
 const PREM_LABEL = { DL: 'DL', TL: 'TL', DW: 'DW', TW: 'TW' };
@@ -25,6 +32,8 @@ let drag = null;            // active drag state
 let busy = false;           // AI thinking / animating -> lock input
 let hint = null;            // dev-panel best-word highlight {cells, word, score}
 let settings = { devPanel: false };
+let achTracker = newTracker();      // per-game achievement accumulator
+let armed = { multiplier: 0, multItem: null, extraTurn: false }; // armed power-ups
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -33,6 +42,7 @@ const $ = (id) => document.getElementById(id);
 export function startUI() {
   bindControls();
   refreshWallet();
+  updateAchBadge();
   settings = getSettings();
   applySettings();
   // Show "What's new" once per release.
@@ -59,20 +69,30 @@ function coordLabel(row, col) {
   return String.fromCharCode(65 + col) + (row + 1);
 }
 
-// Compute and show the best word the human can currently play.
+// Compute the best word for the current human, highlight it on the board, and
+// return { word, score, label } (or null if there's no legal move).
+function computeBestWordHint() {
+  if (!isHumanTurn()) return null;
+  const player = currentPlayer(game);
+  const res = bestMove(game.board, player.rack);
+  if (!res) { hint = null; renderBoard(); return null; }
+  const first = res.move.placement.slice().sort((a, b) => (a.row - b.row) || (a.col - b.col))[0];
+  hint = {
+    cells: res.move.placement.map((p) => ({ row: p.row, col: p.col, letter: p.letter, blank: !!p.blank })),
+    word: res.word,
+  };
+  renderBoard();
+  return { word: res.word, score: res.score, label: `${res.word.toUpperCase()} — ${res.score} pts @ ${coordLabel(first.row, first.col)}` };
+}
+
+// Dev-panel button: show the best word in the dev panel result line.
 function showBestWord() {
   if (!settings.devPanel) return;
   if (!isHumanTurn()) { $('best-result').textContent = 'Wait for your turn'; return; }
   $('best-result').textContent = 'Searching…';
-  // Defer so the label paints before the (synchronous) search.
   setTimeout(() => {
-    const player = currentPlayer(game);
-    const res = bestMove(game.board, player.rack);
-    if (!res) { $('best-result').textContent = 'No move available — try swapping.'; hint = null; renderBoard(); return; }
-    const first = res.move.placement.slice().sort((a, b) => (a.row - b.row) || (a.col - b.col))[0];
-    hint = { cells: res.move.placement.map((p) => ({ row: p.row, col: p.col, letter: p.letter, blank: !!p.blank })), word: res.word };
-    $('best-result').textContent = `${res.word.toUpperCase()} — ${res.score} pts @ ${coordLabel(first.row, first.col)}`;
-    renderBoard();
+    const r = computeBestWordHint();
+    $('best-result').textContent = r ? r.label : 'No move available — try swapping.';
   }, 20);
 }
 
@@ -99,6 +119,9 @@ export function startNewGame(config) {
   selectedRackIndex = null;
   hint = null;
   busy = false;
+  achTracker = newTracker();
+  armed = { multiplier: 0, multItem: null, extraTurn: false };
+  renderArmed();
   render();
   maybeRunAI();
 }
@@ -253,6 +276,7 @@ function updateControls() {
   $('btn-shuffle').disabled = !human || busy;
   $('btn-swap').disabled = !human || busy || game.bag.length < RACK_SIZE;
   $('btn-pass').disabled = !human || busy || !active;
+  $('btn-powerups').disabled = !human || busy;
 }
 
 function isHumanTurn() {
@@ -324,22 +348,71 @@ function livePreview() {
 
 function commitPlay() {
   if (!isHumanTurn() || pending.length === 0) return;
+  const human = currentPlayer(game);
   const placement = pending.map((p) => ({ row: p.row, col: p.col, letter: p.letter, blank: p.blank }));
-  const res = submitPlay(game, placement);
+  const opts = {};
+  if (armed.multiplier > 1) opts.scoreMultiplier = armed.multiplier;
+  if (armed.extraTurn) opts.extraTurn = true;
+
+  const res = submitPlay(game, placement, opts);
   if (!res.ok) { message(res.error, 'error'); return; }
+
+  // Consume the armed power-ups now that the play went through.
+  const usedMult = armed.multiplier > 1 ? armed.multItem : null;
+  const usedExtra = armed.extraTurn;
+  if (usedMult) useItem(usedMult);
+  if (usedExtra) useItem('extraTurn');
+  armed = { multiplier: 0, multItem: null, extraTurn: false };
+  renderArmed();
+
   const word = res.words.find((w) => w.isMain) || res.words[0];
   pending = [];
   selectedRackIndex = null;
   hint = null;
-  message(`You played ${word.word.toUpperCase()} for ${res.score}${res.bingo ? ' — BINGO!' : ''}`, 'ok');
+  let msg = `You played ${word.word.toUpperCase()} for ${res.score}${res.bingo ? ' — BINGO!' : ''}`;
+  if (usedMult) msg += ` (×${SHOP_BY_ID[usedMult].name.includes('Triple') ? 3 : 2})`;
+  if (usedExtra) msg += ' — extra turn!';
+  message(msg, 'ok');
+
+  // Achievements from this play.
+  evalPlayAchievements(human, res);
+
   render();
   if (checkEnd()) return;
   maybeRunAI();
 }
 
+function evalPlayAchievements(human, res) {
+  const ids = evaluatePlay(achTracker, {
+    words: res.words.map((w) => w.word),
+    score: res.score,
+    bingo: res.bingo,
+    cumulativeScore: human.score,
+  });
+  processAchievements(ids);
+}
+
+function processAchievements(ids) {
+  if (!ids || !ids.length) return;
+  const fresh = unlockAchievements(ids);
+  if (!fresh.length) return;
+  updateAchBadge();
+  const names = fresh.map((id) => ACHIEVEMENT_BY_ID[id] && ACHIEVEMENT_BY_ID[id].name).filter(Boolean);
+  toast(`🏆 Unlocked: ${names.join(', ')} — claim in the 🏆 menu`);
+}
+
+function clearArmed() {
+  // Turn is ending without a play; un-arm power-ups (they weren't consumed).
+  if (armed.multiplier || armed.extraTurn) {
+    armed = { multiplier: 0, multItem: null, extraTurn: false };
+    renderArmed();
+  }
+}
+
 function doPass() {
   if (!isHumanTurn()) return;
   recallAll();
+  clearArmed();
   passTurn(game);
   render();
   if (checkEnd()) return;
@@ -350,6 +423,7 @@ function doSwap(tiles) {
   const res = swapTiles(game, tiles);
   if (!res.ok) { message(res.error, 'error'); return false; }
   recallAll();
+  clearArmed();
   message(`Swapped ${tiles.length} tile(s).`, 'ok');
   render();
   maybeRunAI();
@@ -435,6 +509,14 @@ function showEndDialog() {
     refreshWallet();
   }
 
+  // Game-end achievements (win / beat-difficulty / randomized win).
+  const aiOpp = game.players.find((p) => p.type === 'ai');
+  processAchievements(evaluateGameEnd({
+    won,
+    difficulty: aiOpp ? aiOpp.difficulty : null,
+    mode: game.mode,
+  }));
+
   const title = game.tie ? "It's a tie!"
     : won ? 'You win! 🎉'
     : `${escapeHtml(game.players.find((p) => p.id === game.winner)?.name || 'Opponent')} wins`;
@@ -455,6 +537,220 @@ function refreshWallet() {
   const w = getWallet();
   $('wallet-coins').textContent = w.coins;
   $('wallet-gems').textContent = w.gems;
+}
+
+// ---------- Toast ----------
+let toastTimer = null;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), 4500);
+}
+
+// ---------- Achievements ----------
+function updateAchBadge() {
+  const a = getAchievements();
+  let claimable = 0;
+  for (const id in a.unlocked) if (!a.claimed[id]) claimable++;
+  const b = $('ach-badge');
+  if (claimable > 0) { b.textContent = claimable; b.classList.remove('hidden'); }
+  else b.classList.add('hidden');
+}
+
+function openAchievements() { renderAchievements(); $('ach-dialog').classList.remove('hidden'); }
+
+function renderAchievements() {
+  const a = getAchievements();
+  const body = $('ach-body');
+  body.innerHTML = '';
+  let unlocked = 0;
+  let claimable = 0;
+  for (const cat of ACHIEVEMENT_CATEGORIES) {
+    const head = document.createElement('div');
+    head.className = 'ach-cat';
+    head.textContent = cat;
+    body.appendChild(head);
+    for (const ach of ACHIEVEMENTS.filter((x) => x.category === cat)) {
+      const isUnlocked = !!a.unlocked[ach.id];
+      const isClaimed = !!a.claimed[ach.id];
+      if (isUnlocked) unlocked++;
+      if (isUnlocked && !isClaimed) claimable++;
+      const row = document.createElement('div');
+      row.className = 'ach-item' + (isUnlocked ? '' : ' locked');
+      let stateHtml;
+      if (isClaimed) stateHtml = '<span class="ach-state tick">✓ Claimed</span>';
+      else if (isUnlocked) stateHtml = `<button class="btn btn-primary btn-small" data-claim="${ach.id}">Claim 💎${ach.gems}</button>`;
+      else stateHtml = '<span class="ach-state">Locked</span>';
+      row.innerHTML = `<span class="ach-name">${escapeHtml(ach.name)}</span>` +
+        `<span class="ach-gems">💎${ach.gems}</span>${stateHtml}`;
+      body.appendChild(row);
+    }
+  }
+  body.querySelectorAll('[data-claim]').forEach((btn) => {
+    btn.addEventListener('click', () => doClaim(btn.dataset.claim));
+  });
+  $('ach-summary').textContent =
+    `${unlocked} of ${ACHIEVEMENTS.length} unlocked · ${claimable} ready to claim`;
+}
+
+function doClaim(id) {
+  const ach = ACHIEVEMENT_BY_ID[id];
+  const gems = claimAchievement(id, ach.gems);
+  if (gems > 0) {
+    refreshWallet();
+    updateAchBadge();
+    toast(`Claimed 💎${gems} — ${ach.name}`);
+    renderAchievements();
+  }
+}
+
+function claimAll() {
+  const a = getAchievements();
+  let total = 0;
+  let count = 0;
+  for (const ach of ACHIEVEMENTS) {
+    if (a.unlocked[ach.id] && !a.claimed[ach.id]) {
+      total += claimAchievement(ach.id, ach.gems);
+      count++;
+    }
+  }
+  if (count > 0) {
+    refreshWallet();
+    updateAchBadge();
+    toast(`Claimed ${count} achievement${count > 1 ? 's' : ''} for 💎${total}`);
+  }
+  renderAchievements();
+}
+
+// ---------- Shop ----------
+function openShop() { renderShop(); $('shop-dialog').classList.remove('hidden'); }
+
+function renderShop() {
+  $('shop-gems').textContent = getWallet().gems;
+  const inv = getInventory();
+  const body = $('shop-body');
+  body.innerHTML = '';
+  for (const item of SHOP_ITEMS) {
+    const owned = inv[item.id] || 0;
+    const card = document.createElement('div');
+    card.className = 'shop-card';
+    card.innerHTML =
+      `<span class="shop-icon">${item.icon}</span>` +
+      `<div class="shop-info"><div class="shop-name">${escapeHtml(item.name)}` +
+      `<span class="rarity ${item.rarity}">${item.rarity}</span></div>` +
+      `<div class="shop-desc">${escapeHtml(item.desc)}</div>` +
+      `<div class="shop-own">Owned: ${owned}</div></div>` +
+      `<button class="btn btn-primary shop-buy" data-buy="${item.id}">💎${item.cost}</button>`;
+    body.appendChild(card);
+  }
+  body.querySelectorAll('[data-buy]').forEach((btn) => {
+    btn.addEventListener('click', () => doBuy(btn.dataset.buy));
+  });
+}
+
+function doBuy(id) {
+  const item = SHOP_BY_ID[id];
+  if (buyItem(id, item.cost)) {
+    refreshWallet();
+    renderShop();
+    toast(`Bought ${item.name}. Use it from ⚡ Power-ups on your turn.`);
+  } else {
+    toast(`Not enough gems for ${item.name} (need 💎${item.cost}).`);
+  }
+}
+
+// ---------- Power-ups (in-game use) ----------
+function renderArmed() {
+  const el = $('armed-banner');
+  const parts = [];
+  if (armed.multiplier > 1) parts.push(`Next word ×${armed.multiplier}`);
+  if (armed.extraTurn) parts.push('Extra turn ready');
+  if (parts.length) { el.textContent = '⚡ ' + parts.join(' · '); el.classList.remove('hidden'); }
+  else el.classList.add('hidden');
+}
+
+function openPowerups() {
+  if (!isHumanTurn()) { toast('You can only use power-ups on your turn.'); return; }
+  renderPowerups();
+  $('powerups-dialog').classList.remove('hidden');
+}
+
+function renderPowerups() {
+  const inv = getInventory();
+  const body = $('powerups-body');
+  body.innerHTML = '';
+  const owned = SHOP_ITEMS.filter((i) => (inv[i.id] || 0) > 0);
+  if (owned.length === 0) {
+    body.innerHTML = '<p class="muted">You don\'t own any power-ups yet. Buy some in the Shop (🛒).</p>';
+    return;
+  }
+  for (const item of owned) {
+    const count = inv[item.id];
+    const card = document.createElement('div');
+    card.className = 'shop-card';
+    card.innerHTML =
+      `<span class="shop-icon">${item.icon}</span>` +
+      `<div class="shop-info"><div class="shop-name">${escapeHtml(item.name)}</div>` +
+      `<div class="shop-desc">${escapeHtml(item.desc)}</div>` +
+      `<div class="shop-own">Owned: ${count}</div></div>` +
+      `<button class="btn btn-primary shop-buy" data-use="${item.id}">Use</button>`;
+    body.appendChild(card);
+  }
+  body.querySelectorAll('[data-use]').forEach((btn) => {
+    btn.addEventListener('click', () => usePowerup(btn.dataset.use));
+  });
+}
+
+function usePowerup(id) {
+  if (!isHumanTurn()) { toast('You can only use power-ups on your turn.'); return; }
+  const inv = getInventory();
+  if (!inv[id]) return;
+
+  switch (id) {
+    case 'hint': {
+      if (!useItem('hint')) return;
+      const r = computeBestWordHint();
+      message(r ? `Best word: ${r.label}` : 'No move available — try swapping.', 'ok');
+      break;
+    }
+    case 'rerack': {
+      if (!useItem('rerack')) return;
+      redrawRack(game);
+      pending = [];
+      selectedRackIndex = null;
+      message('Drew a fresh rack.', 'ok');
+      render();
+      break;
+    }
+    case 'freeSwap': {
+      // Open the swap dialog in "free" mode (keeps the turn). Consumed on confirm.
+      $('powerups-dialog').classList.add('hidden');
+      openSwapDialog(true);
+      return;
+    }
+    case 'doubleWord':
+    case 'tripleWord': {
+      const mult = id === 'tripleWord' ? 3 : 2;
+      armed.multiplier = mult;
+      armed.multItem = id;
+      renderArmed();
+      message(`Armed ${SHOP_BY_ID[id].name}: your next word scores ×${mult}.`, 'ok');
+      break;
+    }
+    case 'extraTurn': {
+      armed.extraTurn = true;
+      renderArmed();
+      message('Armed Extra Turn: play again after your next word.', 'ok');
+      break;
+    }
+    default:
+      return;
+  }
+  $('powerups-dialog').classList.add('hidden');
+  renderShop();
+  updateControls();
 }
 
 // ---------- Blank picker ----------
@@ -479,7 +775,6 @@ function bindControls() {
   $('btn-recall').addEventListener('click', recallAll);
   $('btn-shuffle').addEventListener('click', shuffleRack);
   $('btn-pass').addEventListener('click', doPass);
-  $('btn-swap').addEventListener('click', openSwapDialog);
   $('btn-again').addEventListener('click', () => { $('end-dialog').classList.add('hidden'); openNewDialog(); });
   $('btn-notes').addEventListener('click', openNotes);
   $('btn-notes-close').addEventListener('click', closeNotes);
@@ -490,6 +785,14 @@ function bindControls() {
     applySettings();
   });
   $('btn-best').addEventListener('click', showBestWord);
+  $('btn-swap').addEventListener('click', () => openSwapDialog(false));
+  $('btn-powerups').addEventListener('click', openPowerups);
+  $('btn-powerups-close').addEventListener('click', () => $('powerups-dialog').classList.add('hidden'));
+  $('btn-achievements').addEventListener('click', openAchievements);
+  $('btn-ach-close').addEventListener('click', () => $('ach-dialog').classList.add('hidden'));
+  $('btn-claim-all').addEventListener('click', claimAll);
+  $('btn-shop').addEventListener('click', openShop);
+  $('btn-shop-close').addEventListener('click', () => $('shop-dialog').classList.add('hidden'));
 
   const board = $('board');
   const rack = $('rack');
@@ -638,7 +941,8 @@ function clearDropHighlight() {
 }
 
 // ---------- Swap dialog ----------
-function openSwapDialog() {
+// free=true is the Free Swap power-up: swap without ending the turn.
+function openSwapDialog(free = false) {
   if (!isHumanTurn()) return;
   recallAll();
   const player = currentPlayer(game);
@@ -661,10 +965,20 @@ function openSwapDialog() {
     if (picks.size === 0) return;
     const tiles = [...picks].map((i) => player.rack[i]);
     dlg.classList.add('hidden');
-    doSwap(tiles);
+    if (free) doFreeSwap(tiles);
+    else doSwap(tiles);
   };
   $('btn-swap-cancel').onclick = () => dlg.classList.add('hidden');
   dlg.classList.remove('hidden');
+}
+
+// Free Swap power-up: swap tiles but keep the turn. Consumes one item.
+function doFreeSwap(tiles) {
+  const res = swapTiles(game, tiles, { keepTurn: true });
+  if (!res.ok) { message(res.error, 'error'); return; }
+  useItem('freeSwap');
+  message(`Free-swapped ${tiles.length} tile(s) — still your turn.`, 'ok');
+  render();
 }
 
 // ---------- New game dialog ----------

@@ -2,9 +2,20 @@
 // top entry's version makes the "What's new" dialog pop once for returning
 // players. Keep entries short and player-facing.
 
-export const VERSION = 'v0.0.1-alpha';
+export const VERSION = 'v0.0.2-alpha';
 
 export const PATCH_NOTES = [
+  {
+    version: 'v0.0.2-alpha',
+    date: '2026-06-25',
+    title: 'Achievements & Shop',
+    changes: [
+      'New Achievements menu (🏆): unlock 44 achievements as you play and tap Claim to collect gems.',
+      'Gems are now earned by claiming achievements — for word lengths, point milestones, letter feats, wins and more.',
+      'New Shop (🛒): spend gems on power-ups (10–100 gems by rarity). They stack.',
+      'Use power-ups on your turn (⚡): Best-Word Hint, Free Swap, Fresh Rack, Double Word, Triple Word, and Extra Turn.',
+    ],
+  },
   {
     version: 'v0.0.1-alpha',
     date: '2026-06-25',

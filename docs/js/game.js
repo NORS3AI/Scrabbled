@@ -77,9 +77,11 @@ function refill(player, bag) {
   if (need > 0) player.rack.push(...draw(bag, need));
 }
 
-// Submit a play. placement: [{row,col,letter,blank}]. Returns
-// { ok:true, score, words, bingo } or { ok:false, error }.
-export function submitPlay(game, placement) {
+// Submit a play. placement: [{row,col,letter,blank}].
+// opts: { scoreMultiplier=1 } (Double/Triple Word power-up),
+//       { extraTurn=false } (Extra Turn power-up keeps the turn).
+// Returns { ok:true, score, words, bingo } or { ok:false, error }.
+export function submitPlay(game, placement, opts = {}) {
   if (game.status !== 'active') return { ok: false, error: 'Game is over.' };
   const player = currentPlayer(game);
 
@@ -90,9 +92,10 @@ export function submitPlay(game, placement) {
   if (!v.valid) return { ok: false, error: v.error };
 
   const s = scoreMove(game.board, placement, v.words);
+  const gained = s.score * (opts.scoreMultiplier || 1);
   applyPlacement(game.board, placement);
   player.rack = newRack;
-  player.score += s.score;
+  player.score += gained;
   refill(player, game.bag);
 
   game.history.push({
@@ -101,24 +104,39 @@ export function submitPlay(game, placement) {
     type: 'play',
     placement: placement.map((p) => ({ ...p })),
     words: v.words.map((w) => w.word),
-    score: s.score,
+    score: gained,
     bingo: s.bingo,
   });
 
-  game.scorelessStreak = s.score > 0 ? 0 : game.scorelessStreak + 1;
+  game.scorelessStreak = gained > 0 ? 0 : game.scorelessStreak + 1;
 
   // End if this player emptied their rack and the bag is empty.
   if (player.rack.length === 0 && game.bag.length === 0) {
     finishGame(game, player.id);
+  } else if (opts.extraTurn) {
+    // Keep the turn with the same player (opponent is skipped once).
   } else {
     advanceTurn(game);
     maybeEndOnStalemate(game);
   }
-  return { ok: true, score: s.score, words: v.words, bingo: s.bingo };
+  return { ok: true, score: gained, words: v.words, bingo: s.bingo };
+}
+
+// Power-up: return the whole rack to the bag and draw a fresh 7, keeping the
+// turn. Does not count toward the stalemate streak.
+export function redrawRack(game) {
+  if (game.status !== 'active') return { ok: false, error: 'Game is over.' };
+  const player = currentPlayer(game);
+  const old = player.rack.slice();
+  player.rack = [];
+  refill(player, game.bag);
+  for (const t of old) game.bag.push(t);
+  return { ok: true };
 }
 
 // Swap tiles back into the bag and redraw. tiles: array of rack letters.
-export function swapTiles(game, tiles) {
+// opts.keepTurn (Free Swap power-up) swaps without ending the turn.
+export function swapTiles(game, tiles, opts = {}) {
   if (game.status !== 'active') return { ok: false, error: 'Game is over.' };
   if (game.bag.length < RACK_SIZE) {
     return { ok: false, error: `Need ${RACK_SIZE} tiles left in the bag to swap.` };
@@ -135,6 +153,8 @@ export function swapTiles(game, tiles) {
   // Returned tiles go back to the bag (placed at the end; bag is shuffled in feel
   // by the seeded build but for swaps we simply append, which is fine for play).
   for (const t of tiles) game.bag.push(t);
+
+  if (opts.keepTurn) return { ok: true };
 
   game.history.push({ player: player.id, playerName: player.name, type: 'swap', count: tiles.length });
   game.scorelessStreak += 1;

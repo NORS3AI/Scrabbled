@@ -15,6 +15,9 @@ import { scoreMove } from '../docs/js/scoring.js';
 import { newGame, submitPlay } from '../docs/js/game.js';
 import { chooseMove, generateMoves } from '../docs/js/ai.js';
 import { PREMIUM_COUNTS, CENTER } from '../docs/js/constants.js';
+import {
+  ACHIEVEMENTS, newTracker, evaluatePlay, evaluateGameEnd,
+} from '../docs/js/achievements.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dictText = readFileSync(join(__dirname, '../docs/data/dictionary.txt'), 'utf8');
@@ -103,6 +106,47 @@ test('game machine: a play scores, refills the rack and switches turn', () => {
   assert.ok(res.score > 0);
   assert.equal(game.players[0].rack.length, 7, 'rack refilled to 7');
   assert.equal(game.current, 1, 'turn advanced');
+});
+
+test('achievements: a play unlocks length, score, tier and letter-group ids', () => {
+  const tracker = newTracker();
+  // QUARTZ for 48, a 6-letter word, using two of QRST (q,r,t) and one of ABCD (a).
+  const ids = evaluatePlay(tracker, { words: ['quartz'], score: 48, bingo: false, cumulativeScore: 48 });
+  assert.ok(ids.includes('len6'));
+  assert.ok(ids.includes('pts20'));
+  assert.ok(ids.includes('pts40'));
+  assert.ok(!ids.includes('pts50'));
+  assert.ok(ids.includes('grp1_QRST'));
+  assert.ok(ids.includes('grp2_QRST'), 'q,r,t are two+ of QRST');
+  assert.ok(ids.includes('grp1_ABCD'), 'a is one of ABCD');
+  assert.ok(!ids.includes('game100'));
+});
+
+test('achievements: bingo and single-game milestones', () => {
+  const tracker = newTracker();
+  const ids = evaluatePlay(tracker, { words: ['retains'], score: 70, bingo: true, cumulativeScore: 120 });
+  assert.ok(ids.includes('bingo'));
+  assert.ok(ids.includes('len7'));
+  assert.ok(ids.includes('pts70'));
+  assert.ok(ids.includes('game100'));
+  assert.ok(!ids.includes('game200'));
+});
+
+test('achievements: game-end win/beat/randomized', () => {
+  assert.deepEqual(
+    evaluateGameEnd({ won: true, difficulty: 'master', mode: 'randomized' }).sort(),
+    ['beat_master', 'randomized_win', 'win'].sort()
+  );
+  assert.deepEqual(evaluateGameEnd({ won: false, difficulty: 'easy', mode: 'standard' }), []);
+  assert.deepEqual(evaluateGameEnd({ won: true, difficulty: null, mode: 'standard' }), ['win']);
+});
+
+test('achievements: catalogue has the expected reward total', () => {
+  // 5 lengths*5 + (bingo+9 tiers)*10 + 5 game*25 + 7 grp1*5 + alphaEach20
+  //   + 7 grp2*10 + alphaEach2 40 + win20 + (10+20+30+40+50+75) + randomized20
+  const total = ACHIEVEMENTS.reduce((s, a) => s + a.gems, 0);
+  assert.equal(ACHIEVEMENTS.length, 44);
+  assert.equal(total, 25 + 100 + 125 + 35 + 20 + 70 + 40 + 20 + 225 + 20);
 });
 
 test('AI generates legal moves and Expert beats Beginner on average score', () => {
