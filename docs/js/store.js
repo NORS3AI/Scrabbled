@@ -62,20 +62,27 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   });
 }
 
-// True if localStorage can actually persist (write + read back). False in
-// Private Browsing / "Block All Cookies" / some in-app browsers — where nothing
-// can survive a refresh, no matter what we do.
+// True if localStorage can actually persist (write + read back). False when the
+// browser blocks site data — Private Browsing, "Block all cookies", a
+// cookie-blocking extension, or an in-app/sandboxed context. Captures the real
+// reason for diagnostics.
+let storageError = null;
 export function storageAvailable() {
+  storageError = null;
   try {
     const k = '__scrabbled_probe__';
     localStorage.setItem(k, '1');
     const ok = localStorage.getItem(k) === '1';
-    localStorage.removeItem(k);
+    try { localStorage.removeItem(k); } catch { /* don't let cleanup fail the probe */ }
+    if (!ok) storageError = 'a write did not persist (a setting or extension may be blocking site data)';
     return ok;
-  } catch {
+  } catch (e) {
+    storageError = (e && e.name ? `${e.name}: ` : '') + (e && e.message ? e.message : 'localStorage is unavailable');
     return false;
   }
 }
+
+export function getStorageError() { return storageError; }
 
 export function getWallet() { return read(WALLET_KEY, DEFAULT_WALLET); }
 export function getStats() { return read(STATS_KEY, DEFAULT_STATS); }
