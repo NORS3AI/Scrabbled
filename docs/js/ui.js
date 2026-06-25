@@ -70,7 +70,7 @@ function showBestWord() {
     const res = bestMove(game.board, player.rack);
     if (!res) { $('best-result').textContent = 'No move available — try swapping.'; hint = null; renderBoard(); return; }
     const first = res.move.placement.slice().sort((a, b) => (a.row - b.row) || (a.col - b.col))[0];
-    hint = { cells: res.move.placement.map((p) => ({ row: p.row, col: p.col, letter: p.letter })), word: res.word };
+    hint = { cells: res.move.placement.map((p) => ({ row: p.row, col: p.col, letter: p.letter, blank: !!p.blank })), word: res.word };
     $('best-result').textContent = `${res.word.toUpperCase()} — ${res.score} pts @ ${coordLabel(first.row, first.col)}`;
     renderBoard();
   }, 20);
@@ -171,12 +171,9 @@ function renderBoard() {
       } else if (pend) {
         cell.appendChild(tileEl(pend.letter, pend.blank, 'pending'));
       } else if (hintMap.has(key)) {
-        // Dev-panel best-word highlight: faint letter on an empty square.
-        cell.classList.add('hint');
-        const span = document.createElement('span');
-        span.className = 'hint-letter';
-        span.textContent = hintMap.get(key).letter.toUpperCase();
-        cell.appendChild(span);
+        // Dev-panel best-word suggestion: a readable tile chip on the square.
+        const h = hintMap.get(key);
+        cell.appendChild(tileEl(h.letter, h.blank, 'hint'));
       } else if (prem && prem !== 'STAR' && PREM_LABEL[prem]) {
         const span = document.createElement('span');
         span.className = 'prem';
