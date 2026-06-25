@@ -62,6 +62,21 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   });
 }
 
+// True if localStorage can actually persist (write + read back). False in
+// Private Browsing / "Block All Cookies" / some in-app browsers — where nothing
+// can survive a refresh, no matter what we do.
+export function storageAvailable() {
+  try {
+    const k = '__scrabbled_probe__';
+    localStorage.setItem(k, '1');
+    const ok = localStorage.getItem(k) === '1';
+    localStorage.removeItem(k);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 export function getWallet() { return read(WALLET_KEY, DEFAULT_WALLET); }
 export function getStats() { return read(STATS_KEY, DEFAULT_STATS); }
 

@@ -2,9 +2,18 @@
 // top entry's version makes the "What's new" dialog pop once for returning
 // players. Keep entries short and player-facing.
 
-export const VERSION = 'v0.0.11-alpha';
+export const VERSION = 'v0.0.12-alpha';
 
 export const PATCH_NOTES = [
+  {
+    version: 'v0.0.12-alpha',
+    date: '2026-06-25',
+    title: 'Why your coins/gems were disappearing',
+    changes: [
+      'If your browser is blocking saved data, the game now shows a clear warning at the top — that is why coins, gems and achievements were being wiped on refresh.',
+      'This happens in Private Browsing, with Safari\'s "Block All Cookies" turned on, or inside in-app browsers. Turn that off (or use a normal Safari/Chrome tab) and your progress will be kept. Nothing the app does can save data when the browser blocks all storage.',
+    ],
+  },
   {
     version: 'v0.0.11-alpha',
     date: '2026-06-25',
