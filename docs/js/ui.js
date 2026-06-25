@@ -14,7 +14,7 @@ import {
   getAchievements, unlockAchievements, claimAchievement,
   getInventory, buyItem, useItem,
   getThemes, buyTheme, selectTheme,
-  saveGame, loadGame, clearSavedGame,
+  saveGame, loadGame, clearSavedGame, storageAvailable,
 } from './store.js';
 import { THEMES, THEME_BY_ID } from './themes.js';
 import {
@@ -52,6 +52,9 @@ export function startUI() {
   settings = getSettings();
   applySettings();
   $('btn-app-version').textContent = `Scrabbled ${VERSION} · patch notes`;
+  // Warn if the browser blocks storage (nothing can persist across a refresh).
+  if (!storageAvailable()) $('storage-warning').classList.remove('hidden');
+  $('btn-storage-dismiss').addEventListener('click', () => $('storage-warning').classList.add('hidden'));
   // Show "What's new" once per release.
   if (getSeenVersion() !== VERSION) openNotes();
 }
