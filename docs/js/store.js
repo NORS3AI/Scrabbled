@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS = { devPanel: false, historyOpen: true };
 const ACH_KEY = 'scrabbled.achievements.v1';
 const INV_KEY = 'scrabbled.inventory.v1';
 const THEMES_KEY = 'scrabbled.themes.v1';
+const GAME_KEY = 'scrabbled.savedgame.v1';
 
 const DEFAULT_WALLET = { coins: 0, gems: 0 };
 const DEFAULT_STATS = {
@@ -146,6 +147,24 @@ export function selectTheme(id) {
   t.selected = id;
   write(THEMES_KEY, t);
   return true;
+}
+
+// --- Saved game (so a tab refresh resumes instead of starting over) ---
+// The game object is plain serializable data, so it round-trips through JSON.
+export function saveGame(game) { write(GAME_KEY, game); }
+
+export function loadGame() {
+  try {
+    const raw = memCache.has(GAME_KEY) ? memCache.get(GAME_KEY) : localStorage.getItem(GAME_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearSavedGame() {
+  memCache.delete(GAME_KEY);
+  try { localStorage.removeItem(GAME_KEY); } catch { /* ignore */ }
 }
 
 export function addCurrency({ coins = 0, gems = 0 }) {

@@ -121,19 +121,17 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.cell .tile.hint').length >= 1, { timeout: 8000 });
   console.log('OK: used Hint power-up (best word highlighted)');
 
-  // Dev mode: auto-place the best word on the board.
+  // Dev mode: enable it; the +gems/+coins buttons now live in Settings.
   await page.click('#btn-settings');
   await page.click('#set-dev');
-  await page.click('#btn-settings-close');
-
-  // Dev currency buttons add gems/coins.
   const gemsBefore = await page.$eval('#wallet-gems', (e) => Number(e.textContent));
-  await page.click('#dev-panel [data-gem="100"]');
+  await page.click('#dev-tools [data-gem="100"]');
   const gemsAfter = await page.$eval('#wallet-gems', (e) => Number(e.textContent));
-  if (gemsAfter !== gemsBefore + 100) fail(`dev +100 gems failed (${gemsBefore} -> ${gemsAfter})`); else console.log('OK: dev +gems button works');
-  await page.click('#dev-panel [data-coin="1000"]');
+  if (gemsAfter !== gemsBefore + 100) fail(`dev +100 gems failed (${gemsBefore} -> ${gemsAfter})`); else console.log('OK: dev +gems button (in Settings) works');
+  await page.click('#dev-tools [data-coin="1000"]');
   const coins = await page.$eval('#wallet-coins', (e) => Number(e.textContent));
-  if (coins < 1000) fail(`dev +coins failed (${coins})`); else console.log('OK: dev +coins button works');
+  if (coins < 1000) fail(`dev +coins failed (${coins})`); else console.log('OK: dev +coins button (in Settings) works');
+  await page.click('#btn-settings-close');
 
   await page.click('#btn-best');
   await page.waitForFunction(() => /pts/.test(document.querySelector('#best-result').textContent), { timeout: 8000 });
@@ -149,12 +147,14 @@ try {
   if (statCells < 5) fail(`stats panel sparse (${statCells} cells)`); else console.log('OK: stats panel renders');
   await page.click('#btn-stats-close');
 
-  // History toggle changes the column's visibility.
+  // History toggle changes the column's visibility — and must NOT hide the dev panel.
   const histVisible = () => page.$eval('.history-wrap', (el) => getComputedStyle(el).display !== 'none');
   const histBefore = await histVisible();
   await page.click('#btn-history');
   const histAfter = await histVisible();
   if (histBefore === histAfter) fail('history toggle did not change visibility'); else console.log('OK: history toggle works');
+  const devStillShown = await page.$eval('#dev-panel', (el) => !el.classList.contains('hidden'));
+  if (!devStillShown) fail('dev panel hidden when toggling history'); else console.log('OK: dev panel stays visible when history toggled');
   await page.click('#btn-history'); // restore
 
   // Drag a rack tile across the board and confirm no ghost artifact remains.
@@ -169,10 +169,17 @@ try {
   if (ghosts !== 0) fail(`drag left ${ghosts} ghost artifact(s)`); else console.log('OK: drag leaves no ghost artifact');
   await page.click('#btn-recall');
 
-  // Pass the turn so the computer plays; it should drop tiles on the board.
+  // Pass the turn so the computer plays; its tiles should be gold-highlighted.
   await page.click('#btn-pass');
-  await page.waitForFunction(() => document.querySelectorAll('#board .tile.locked').length >= 2, { timeout: 15000 });
-  console.log('OK: computer played tiles onto the board');
+  await page.waitForFunction(() => document.querySelectorAll('#board .tile.lastmove').length >= 2, { timeout: 15000 });
+  console.log('OK: computer move highlighted gold (lastmove)');
+
+  // Resume on refresh: reload and the saved game should resume (no new-game dialog).
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForFunction(() => document.querySelectorAll('#board .tile.locked').length >= 2, { timeout: 12000 });
+  const newDialogHidden = await page.$eval('#new-dialog', (d) => d.classList.contains('hidden'));
+  if (!newDialogHidden) fail('new-game dialog appeared after refresh — game did not resume');
+  else console.log('OK: game resumes after a tab refresh');
 
   if (errors.length) fail('console/page errors: ' + errors.join(' | '));
   if (!process.exitCode) console.log('\nALL SMOKE CHECKS PASSED');

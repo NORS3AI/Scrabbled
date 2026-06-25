@@ -141,6 +141,8 @@ body {
 .tile.blank .lt { color: #b23b2e; }
 .tile.pending { box-shadow: 0 0 0 2px var(--accent), 0 2px 4px rgba(0, 0, 0, .3); }
 .tile.locked { cursor: default; }
+/* The tiles the computer just played, highlighted gold until you move. */
+.tile.lastmove { box-shadow: 0 0 0 2px var(--accent), 0 0 8px 2px rgba(233, 185, 73, .85); z-index: 2; }
 .tile.ghost { position: fixed; inset: auto; width: 40px; height: 40px; z-index: 50; pointer-events: none; opacity: .92; }
 
 /* Bottom dock: the tile rack + controls. Smaller, and blends with the page's
@@ -178,6 +180,7 @@ body {
 
 /* Developer panel (in the dock, above the message line) */
 .dev-panel { background: #fff7e0; border: 1px dashed var(--tile-edge); border-radius: 8px; padding: .4rem .55rem; }
+.dev-tools { margin: .2rem 0 .4rem; padding: .5rem .6rem; background: #fff7e0; border: 1px dashed var(--tile-edge); border-radius: 8px; display: flex; flex-direction: column; gap: .35rem; }
 .dev-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .dev-tag { font-size: .65rem; font-weight: 800; color: #fff; background: #b23b2e; padding: .1rem .35rem; border-radius: 4px; letter-spacing: .5px; }
 .best-result { font-weight: 700; color: var(--ink); }
@@ -206,6 +209,12 @@ body {
 }
 .badge.pulse { animation: badgePulse .55s ease 2; }
 @keyframes badgePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.4); } }
+/* Trophy button glow-pulses while there are achievements to claim. */
+.ach-btn.glow { animation: achGlow 1.6s ease-in-out infinite; }
+@keyframes achGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(233, 185, 73, 0); }
+  50% { box-shadow: 0 0 10px 3px rgba(233, 185, 73, .85); }
+}
 
 /* Shared dialog header row */
 .dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
