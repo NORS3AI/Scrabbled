@@ -181,12 +181,25 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('#board .tile.lastmove').length >= 2, { timeout: 15000 });
   console.log('OK: computer move highlighted gold (lastmove)');
 
-  // Move-history panel renders entries and collapses (not hides).
+  // Move-history panel renders entries and collapses (a tap) and drags (a move).
   const histEntries = await page.$$eval('#history li', (els) => els.length);
   if (histEntries < 1) fail('history panel has no entries'); else console.log('OK: move history renders');
   await page.click('#btn-history-toggle');
   const collapsed = await page.$eval('#history-panel', (el) => el.classList.contains('collapsed') && getComputedStyle(el).display !== 'none');
   if (!collapsed) fail('history did not collapse (or got hidden)'); else console.log('OK: history collapses (stays visible)');
+  await page.click('#btn-history-toggle'); // re-expand
+
+  // Drag the header by a clear distance; the panel should move and persist.
+  const before = await page.$eval('#history-panel', (el) => el.getBoundingClientRect().left);
+  const hb = await page.$eval('#btn-history-toggle', (el) => { const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  await page.mouse.move(hb.x, hb.y);
+  await page.mouse.down();
+  await page.mouse.move(hb.x - 200, hb.y + 120, { steps: 8 });
+  await page.mouse.up();
+  const after = await page.$eval('#history-panel', (el) => el.getBoundingClientRect().left);
+  const persisted = await page.evaluate(() => { try { return !!JSON.parse(localStorage.getItem('scrabbled.settings.v1')).historyPos; } catch { return false; } });
+  if (Math.abs(after - before) < 100) fail(`history panel did not move (${before} -> ${after})`); else console.log('OK: history panel drags');
+  if (!persisted) fail('history panel position not persisted'); else console.log('OK: history panel position persists');
 
   // Resume on refresh: reload and the saved game should resume (no new-game dialog).
   await page.reload({ waitUntil: 'networkidle' });

@@ -101,6 +101,7 @@ function applySettings() {
   $('set-low-tiles').checked = !!settings.showOpponentLowTiles;
   $('set-autoplay').checked = !!settings.autoPlay;
   applyHistoryCollapsed();
+  applyHistoryPos();
 }
 
 function applyHistoryCollapsed() {
@@ -110,6 +111,65 @@ function applyHistoryCollapsed() {
 function toggleHistoryCollapsed() {
   settings = setSettings({ historyCollapsed: !settings.historyCollapsed });
   applyHistoryCollapsed();
+}
+
+// Apply (and clamp) the saved floating position of the history panel. With no
+// saved position it falls back to the CSS default (top-right).
+function applyHistoryPos() {
+  const panel = $('history-panel');
+  const pos = settings.historyPos;
+  if (pos && typeof pos.left === 'number') {
+    const pw = panel.offsetWidth || 142;
+    const left = Math.max(2, Math.min(pos.left, window.innerWidth - pw - 2));
+    const top = Math.max(46, Math.min(pos.top, window.innerHeight - 30));
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    panel.style.right = 'auto';
+  } else {
+    panel.style.left = '';
+    panel.style.top = '';
+    panel.style.right = '';
+  }
+}
+
+// Drag the panel by its header; a tap (no movement) toggles collapse instead.
+function initHistoryPanel() {
+  const panel = $('history-panel');
+  const handle = $('btn-history-toggle');
+  let st = null;
+  handle.addEventListener('pointerdown', (e) => {
+    const r = panel.getBoundingClientRect();
+    st = { sx: e.clientX, sy: e.clientY, offX: e.clientX - r.left, offY: e.clientY - r.top, moved: false };
+    try { handle.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!st) return;
+    if (!st.moved && Math.hypot(e.clientX - st.sx, e.clientY - st.sy) > 5) st.moved = true;
+    if (!st.moved) return;
+    const pw = panel.offsetWidth;
+    const left = Math.max(2, Math.min(e.clientX - st.offX, window.innerWidth - pw - 2));
+    const top = Math.max(46, Math.min(e.clientY - st.offY, window.innerHeight - 30));
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    panel.style.right = 'auto';
+  });
+  const end = (e) => {
+    if (!st) return;
+    const moved = st.moved;
+    st = null;
+    try { handle.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    if (moved) {
+      const r = panel.getBoundingClientRect();
+      settings = setSettings({ historyPos: { left: Math.round(r.left), top: Math.round(r.top) } });
+    } else {
+      toggleHistoryCollapsed(); // it was a tap, not a drag
+    }
+  };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', () => { st = null; });
+  // Keep it on-screen if the window resizes.
+  window.addEventListener('resize', applyHistoryPos);
 }
 
 function openSettings() { applySettings(); renderThemePicker(); $('settings-dialog').classList.remove('hidden'); }
@@ -1118,7 +1178,7 @@ function bindControls() {
     toast('Statistics deleted.');
   });
   $('btn-app-version').addEventListener('click', openNotes);
-  $('btn-history-toggle').addEventListener('click', toggleHistoryCollapsed);
+  initHistoryPanel();
   $('btn-best').addEventListener('click', showBestWord);
   $('btn-powerups').addEventListener('click', openPowerups);
   $('btn-powerups-close').addEventListener('click', () => $('powerups-dialog').classList.add('hidden'));

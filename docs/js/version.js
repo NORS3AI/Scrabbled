@@ -2,9 +2,17 @@
 // top entry's version makes the "What's new" dialog pop once for returning
 // players. Keep entries short and player-facing.
 
-export const VERSION = 'v0.0.9-alpha';
+export const VERSION = 'v0.0.10-alpha';
 
 export const PATCH_NOTES = [
+  {
+    version: 'v0.0.10-alpha',
+    date: '2026-06-25',
+    title: 'Draggable history panel',
+    changes: [
+      'The move-history panel can now be dragged anywhere on screen — grab its "Moves" header (⠿) and drop it wherever you like, off the board. Its position is remembered. A quick tap on the header still collapses/expands it.',
+    ],
+  },
   {
     version: 'v0.0.9-alpha',
     date: '2026-06-25',
