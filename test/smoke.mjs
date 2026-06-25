@@ -125,6 +125,16 @@ try {
   await page.click('#btn-settings');
   await page.click('#set-dev');
   await page.click('#btn-settings-close');
+
+  // Dev currency buttons add gems/coins.
+  const gemsBefore = await page.$eval('#wallet-gems', (e) => Number(e.textContent));
+  await page.click('#dev-panel [data-gem="100"]');
+  const gemsAfter = await page.$eval('#wallet-gems', (e) => Number(e.textContent));
+  if (gemsAfter !== gemsBefore + 100) fail(`dev +100 gems failed (${gemsBefore} -> ${gemsAfter})`); else console.log('OK: dev +gems button works');
+  await page.click('#dev-panel [data-coin="1000"]');
+  const coins = await page.$eval('#wallet-coins', (e) => Number(e.textContent));
+  if (coins < 1000) fail(`dev +coins failed (${coins})`); else console.log('OK: dev +coins button works');
+
   await page.click('#btn-best');
   await page.waitForFunction(() => /pts/.test(document.querySelector('#best-result').textContent), { timeout: 8000 });
   await page.click('#btn-place-best');

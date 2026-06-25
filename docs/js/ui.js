@@ -353,6 +353,7 @@ function placeTile(rackIndex, row, col) {
 
 function afterPlace() {
   selectedRackIndex = null;
+  hint = null; // clear any dev best-word preview once the player places a tile
   livePreview();
   render();
 }
@@ -448,10 +449,14 @@ function evalPlayAchievements(human, res) {
 function processAchievements(ids) {
   if (!ids || !ids.length) return;
   const fresh = unlockAchievements(ids);
-  if (!fresh.length) return;
+  if (!fresh.length) return; // already-unlocked ids never re-notify (once and done)
   updateAchBadge();
-  const names = fresh.map((id) => ACHIEVEMENT_BY_ID[id] && ACHIEVEMENT_BY_ID[id].name).filter(Boolean);
-  toast(`🏆 Unlocked: ${names.join(', ')} — claim in the 🏆 menu`);
+  const gems = fresh.reduce((s, id) => s + (ACHIEVEMENT_BY_ID[id] ? ACHIEVEMENT_BY_ID[id].gems : 0), 0);
+  if (fresh.length === 1) {
+    toast(`🏆 Achievement unlocked: ${ACHIEVEMENT_BY_ID[fresh[0]].name} — tap 🏆 to claim 💎${gems}`);
+  } else {
+    toast(`🏆 ${fresh.length} achievements unlocked — tap 🏆 to claim 💎${gems}`);
+  }
 }
 
 function clearArmed() {
@@ -622,8 +627,16 @@ function updateAchBadge() {
   let claimable = 0;
   for (const id in a.unlocked) if (!a.claimed[id]) claimable++;
   const b = $('ach-badge');
-  if (claimable > 0) { b.textContent = claimable; b.classList.remove('hidden'); }
-  else b.classList.add('hidden');
+  if (claimable > 0) {
+    b.textContent = claimable;
+    b.classList.remove('hidden');
+    // Pulse to draw attention that something is claimable.
+    b.classList.remove('pulse');
+    void b.offsetWidth;
+    b.classList.add('pulse');
+  } else {
+    b.classList.add('hidden');
+  }
 }
 
 function openAchievements() { renderAchievements(); $('ach-dialog').classList.remove('hidden'); }
@@ -634,22 +647,31 @@ function renderAchievements() {
   body.innerHTML = '';
   let unlocked = 0;
   let claimable = 0;
+  // Rank: claimable first, then locked, then already-claimed.
+  const rank = (ach) => {
+    const u = !!a.unlocked[ach.id];
+    const c = !!a.claimed[ach.id];
+    if (u && !c) return 0;
+    if (!u) return 1;
+    return 2;
+  };
   for (const cat of ACHIEVEMENT_CATEGORIES) {
     const head = document.createElement('div');
     head.className = 'ach-cat';
     head.textContent = cat;
     body.appendChild(head);
-    for (const ach of ACHIEVEMENTS.filter((x) => x.category === cat)) {
+    const inCat = ACHIEVEMENTS.filter((x) => x.category === cat).slice().sort((x, y) => rank(x) - rank(y));
+    for (const ach of inCat) {
       const isUnlocked = !!a.unlocked[ach.id];
       const isClaimed = !!a.claimed[ach.id];
       if (isUnlocked) unlocked++;
       if (isUnlocked && !isClaimed) claimable++;
       const row = document.createElement('div');
-      row.className = 'ach-item' + (isUnlocked ? '' : ' locked');
+      row.className = 'ach-item' + (isUnlocked ? '' : ' locked') + (isUnlocked && !isClaimed ? ' claimable' : '');
       let stateHtml;
       if (isClaimed) stateHtml = '<span class="ach-state tick">✓ Claimed</span>';
       else if (isUnlocked) stateHtml = `<button class="btn btn-primary btn-small" data-claim="${ach.id}">Claim 💎${ach.gems}</button>`;
-      else stateHtml = '<span class="ach-state">Locked</span>';
+      else stateHtml = '<span class="ach-state">🔒 Locked</span>';
       row.innerHTML = `<span class="ach-name">${escapeHtml(ach.name)}</span>` +
         `<span class="ach-gems">💎${ach.gems}</span>${stateHtml}`;
       body.appendChild(row);
@@ -904,6 +926,21 @@ function bindControls() {
   $('btn-history').addEventListener('click', toggleHistory);
   $('btn-history-collapse').addEventListener('click', toggleHistory);
   $('btn-place-best').addEventListener('click', placeBestWord);
+  // Dev currency buttons (+gems / +coins) via delegation.
+  $('dev-panel').addEventListener('click', (e) => {
+    const gem = e.target.closest('[data-gem]');
+    const coin = e.target.closest('[data-coin]');
+    if (gem) {
+      const n = Number(gem.dataset.gem);
+      addCurrency({ gems: n });
+      refreshWallet();
+      showGemGain(n);
+    } else if (coin) {
+      const n = Number(coin.dataset.coin);
+      addCurrency({ coins: n });
+      refreshWallet();
+    }
+  });
 
   const board = $('board');
   const rack = $('rack');

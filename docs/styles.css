@@ -140,7 +140,7 @@ body {
 .tile.blank .lt { color: #b23b2e; }
 .tile.pending { box-shadow: 0 0 0 2px var(--accent), 0 2px 4px rgba(0, 0, 0, .3); }
 .tile.locked { cursor: default; }
-.tile.ghost { position: fixed; width: 40px; height: 40px; z-index: 50; pointer-events: none; opacity: .92; }
+.tile.ghost { position: fixed; inset: auto; width: 40px; height: 40px; z-index: 50; pointer-events: none; opacity: .92; }
 
 /* Bottom dock: holds the tile rack + controls, pinned to the bottom. */
 .dock {
@@ -191,6 +191,8 @@ body {
   background: #e3603b; color: #fff; border-radius: 10px; font-size: .65rem;
   font-weight: 800; display: grid; place-items: center; padding: 0 4px;
 }
+.badge.pulse { animation: badgePulse .55s ease 2; }
+@keyframes badgePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.4); } }
 
 /* Shared dialog header row */
 .dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
@@ -203,6 +205,7 @@ body {
 .ach-item { display: flex; align-items: center; gap: .6rem; padding: .45rem .2rem; border-bottom: 1px solid var(--line); }
 .ach-item .ach-name { flex: 1; font-weight: 600; }
 .ach-item.locked { opacity: .55; }
+.ach-item.claimable { background: #eafaf0; border-radius: 6px; padding-left: .4rem; padding-right: .4rem; }
 .ach-item .ach-gems { font-weight: 700; color: #1f6f54; white-space: nowrap; }
 .ach-item .ach-state { font-size: .78rem; color: #6b7a83; white-space: nowrap; }
 .ach-item .tick { color: #1f6f54; font-weight: 800; }
@@ -246,12 +249,14 @@ body {
   max-width: 90vw; text-align: center;
 }
 
-/* Best-word hint: a readable suggestion tile drawn on the board (dev panel). */
+/* Best-word hint: a readable, clearly-a-preview tile drawn on the board (dev
+   panel). Dashed border marks it as a suggestion, not a placed tile. */
 .cell .tile.hint {
   background: linear-gradient(180deg, #ffe9b0, #ffd166);
-  border: 2px solid #b23b2e; color: #5a2018; z-index: 4;
-  box-shadow: 0 0 0 2px rgba(178, 59, 46, .35), 0 2px 4px rgba(0, 0, 0, .3);
+  border: 2px dashed #b23b2e; color: #5a2018; z-index: 4;
+  box-shadow: 0 0 0 2px rgba(178, 59, 46, .3);
 }
+.cell .tile.hint .lt { font-size: clamp(.6rem, 2.2vw, 1.05rem); }
 .message { min-height: 1.2rem; font-weight: 600; text-align: center; }
 .message.error { color: #c0392b; }
 .message.ok { color: var(--primary); }

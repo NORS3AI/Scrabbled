@@ -133,6 +133,8 @@ browser and Node.
   **stack** and are used on your turn (⚡): Best-Word Hint, Free Swap, Fresh
   Rack, Double Word, Triple Word, Extra Turn.
 - 🟡 Power-up balancing — initial pass; tune as play data comes in.
+- ⬜ **Cosmetics store (coins):** gems buy power-ups; **coins** will buy cosmetic
+  themes — tile faces, stickers, and board colors/themes. Planned.
 - ⬜ Server-side achievements/inventory so they follow the account across
   devices (backend phase).
 
