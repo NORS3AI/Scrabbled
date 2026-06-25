@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-cache" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#1f6f54" />
   <meta name="description" content="Scrabbled — an ad-free, turn-based word game with AI opponents, randomized boards, and an earn-by-playing store. Plays entirely in your browser." />
@@ -24,7 +25,7 @@
   <header class="topbar">
     <div class="brand"><span class="logo-mark small">S</span> Scrabbled</div>
     <div class="wallet">
-      <button id="btn-notes" class="ver-badge" title="Patch notes">v0.0.4-alpha</button>
+      <button id="btn-notes" class="ver-badge" title="Patch notes">v0.0.5-alpha</button>
       <span class="coin" title="Coins">🪙 <b id="wallet-coins">0</b></span>
       <span class="gem" title="Gems">💎 <b id="wallet-gems">0</b><span id="gem-gain" class="gem-gain"></span></span>
       <button id="btn-achievements" class="btn btn-icon ach-btn" title="Achievements" aria-label="Achievements">🏆<span id="ach-badge" class="badge hidden">0</span></button>
@@ -38,15 +39,16 @@
 
   <main id="app" class="app hidden">
     <div class="stage">
+      <div class="scoreboard" id="scoreboard"></div>
+
       <section class="board-area">
-        <div class="scoreboard" id="scoreboard"></div>
         <div id="board" class="board" aria-label="Game board"></div>
         <div class="bag-info"><span id="bag-count">100</span> tiles in bag</div>
       </section>
 
       <aside class="history-wrap">
         <div class="history-head">
-          <h2>Move history</h2>
+          <h2>History</h2>
           <button id="btn-history-collapse" class="btn btn-small" title="Hide history">Hide ›</button>
         </div>
         <ol id="history" class="history"></ol>
@@ -175,7 +177,7 @@
     <div class="overlay-card wide">
       <div class="dialog-head">
         <h2>Shop</h2>
-        <span class="shop-gems">💎 <b id="shop-gems">0</b></span>
+        <span class="shop-gems">💎 <b id="shop-gems">0</b> &nbsp; 🪙 <b id="shop-coins">0</b></span>
       </div>
       <p class="muted small">Power-ups stack and can be used on your turn. Earn gems by claiming achievements.</p>
       <div id="shop-body" class="shop-body"></div>
@@ -214,6 +216,11 @@
   <div id="settings-dialog" class="overlay hidden">
     <div class="overlay-card wide">
       <h2>Settings</h2>
+      <div class="field">
+        <label>Background theme</label>
+        <div id="theme-picker" class="theme-picker"></div>
+        <p class="muted small">Buy more backgrounds with coins in the Shop (🛒).</p>
+      </div>
       <label class="check-row">
         <input type="checkbox" id="set-dev" />
         <span>
