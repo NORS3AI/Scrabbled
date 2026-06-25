@@ -62,17 +62,20 @@ body {
 .app {
   display: flex; flex-direction: column;
   height: calc(100dvh - 53px); /* viewport minus the top bar */
-  max-width: 1100px; margin: 0 auto; width: 100%;
+  width: 100%;
 }
 .stage {
-  flex: 1; min-height: 0; display: flex; gap: 1rem;
+  position: relative; /* history panel is positioned within this */
+  flex: 1; min-height: 0; display: flex;
   padding: .6rem 1rem 0; justify-content: center; align-items: flex-start;
 }
 .board-area {
   display: flex; flex-direction: column; align-items: center; gap: .5rem;
-  min-width: 0; min-height: 0; flex: 0 1 auto;
+  min-width: 0; min-height: 0; height: 100%;
+  width: 100%; max-width: min(94vw, 520px);
 }
-.scoreboard { display: flex; gap: .6rem; width: 100%; max-width: min(94vw, calc(100dvh - 300px), 520px); }
+.scoreboard { display: flex; gap: .6rem; width: 100%; flex: 0 0 auto; }
+.bag-info { flex: 0 0 auto; }
 .player-card {
   flex: 1; background: var(--paper); border-radius: 10px; padding: .5rem .7rem;
   display: flex; align-items: center; justify-content: space-between; box-shadow: var(--shadow);
@@ -85,8 +88,11 @@ body {
 
 /* Board */
 .board {
-  /* Smaller, and sized to fit between the scoreboard and the bottom dock. */
-  width: min(94vw, calc(100dvh - 300px), 520px); aspect-ratio: 1 / 1;
+  /* Fill the space the scoreboard/dock leave, staying square. flex sizing here
+     (rather than a fixed height guess) keeps the board from overflowing onto
+     the dock when the dock grows — e.g. with the dev panel open. */
+  flex: 1 1 auto; min-height: 0; aspect-ratio: 1 / 1;
+  width: auto; max-width: 100%; max-height: 100%; margin: 0 auto;
   display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr);
   gap: 2px; background: var(--board-line); padding: 4px; border-radius: 8px; box-shadow: var(--shadow);
 }
@@ -161,18 +167,23 @@ body {
 .check-row input { width: 20px; height: 20px; margin-top: .15rem; flex: 0 0 auto; }
 .check-row small { display: block; margin-top: .15rem; }
 
-/* Best-word hint highlight on the board */
-.cell.hint { outline: 3px solid #b23b2e; outline-offset: -3px; z-index: 2; }
-.cell .hint-letter { color: #b23b2e; font-weight: 800; opacity: .85; font-size: clamp(.6rem, 2.4vw, 1.1rem); }
+/* Best-word hint: a readable suggestion tile drawn on the board (dev panel). */
+.cell .tile.hint {
+  background: linear-gradient(180deg, #ffe9b0, #ffd166);
+  border: 2px solid #b23b2e; color: #5a2018; z-index: 4;
+  box-shadow: 0 0 0 2px rgba(178, 59, 46, .35), 0 2px 4px rgba(0, 0, 0, .3);
+}
 .message { min-height: 1.2rem; font-weight: 600; text-align: center; }
 .message.error { color: #c0392b; }
 .message.ok { color: var(--primary); }
 
-/* History (desktop sidebar) */
+/* History sidebar. Hidden by default and floated out of the centring flow so it
+   never shifts the board off-centre; shown only when there's room beside a
+   centred board (see the min-width rule below). */
 .history-wrap {
+  display: none;
   background: var(--paper); border-radius: 12px; padding: .8rem 1rem; box-shadow: var(--shadow);
-  width: 280px; flex: 0 0 280px; max-height: 100%; overflow: hidden;
-  display: flex; flex-direction: column;
+  width: 280px; overflow: hidden; flex-direction: column;
 }
 .history-wrap h2 { margin: .2rem 0 .6rem; font-size: 1rem; }
 .history { margin: 0; padding-left: 1.2rem; overflow-y: auto; font-size: .9rem; }
@@ -214,9 +225,17 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 .thinking { position: fixed; bottom: 172px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, .8); color: #fff; padding: .5rem 1rem; border-radius: 20px; z-index: 15; font-size: .9rem; }
 
-/* Responsive — hide the history sidebar on tablet/phone; the dock stays. */
+/* Only show the history panel when the viewport is wide enough that it sits
+   beside a viewport-centred board without overlapping it. The board stays
+   centred at every width. */
+@media (min-width: 1240px) {
+  .history-wrap {
+    display: flex; position: absolute; top: .6rem; right: 1.5rem;
+    max-height: calc(100% - .6rem);
+  }
+}
+
 @media (max-width: 900px) {
-  .history-wrap { display: none; }
   .stage { padding: .5rem .5rem 0; }
 }
 @media (max-width: 480px) {
@@ -227,8 +246,8 @@ body {
   .wallet .btn { padding: .4rem .6rem; }
   .brand { font-size: 1.1rem; }
 }
-/* Landscape phones / short screens: shrink board so the dock stays visible. */
+/* Landscape phones / short screens: narrow the board column so the square board
+   (sized by height via flex) stays centred and the dock stays visible. */
 @media (max-height: 560px) {
-  .board { width: min(70vh, 94vw); }
-  .scoreboard { max-width: min(70vh, 94vw); }
+  .board-area { max-width: min(78vh, 94vw); }
 }
