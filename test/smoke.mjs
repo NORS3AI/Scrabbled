@@ -139,6 +139,16 @@ try {
   await page.click('#btn-place-best');
   await page.waitForFunction(() => document.querySelectorAll('#board .tile.pending').length >= 2, { timeout: 8000 });
   console.log('OK: dev "Place on board" placed the best word');
+
+  // Play is the first control and noticeably wider than the others.
+  const layout = await page.evaluate(() => {
+    const ids = [...document.querySelectorAll('.controls .btn')].map((b) => b.id);
+    const play = document.getElementById('btn-play').getBoundingClientRect().width;
+    const shuffle = document.getElementById('btn-shuffle').getBoundingClientRect().width;
+    return { first: ids[0], playWider: play > shuffle * 1.3 };
+  });
+  if (layout.first !== 'btn-play') fail(`Play is not first (${layout.first})`); else console.log('OK: Play is the first control');
+  if (!layout.playWider) fail('Play button is not wider'); else console.log('OK: Play button is wider');
   await page.click('#btn-swap'); // recall the placed tiles
 
   // Buy a theme with coins and confirm it recolors the tiles (CSS var changes).
@@ -177,6 +187,18 @@ try {
   const newDialogHidden = await page.$eval('#new-dialog', (d) => d.classList.contains('hidden'));
   if (!newDialogHidden) fail('new-game dialog appeared after refresh — game did not resume');
   else console.log('OK: game resumes after a tab refresh');
+
+  // Auto-play: enable it, place the best word, and it should play itself in ~3s.
+  await page.waitForFunction(() => !document.getElementById('btn-play').disabled || true, { timeout: 8000 });
+  await page.click('#btn-settings');
+  await page.click('#set-autoplay');
+  await page.click('#btn-settings-close');
+  await page.click('#btn-best');
+  await page.waitForFunction(() => /pts/.test(document.querySelector('#best-result').textContent), { timeout: 8000 });
+  await page.click('#btn-place-best');
+  await page.waitForFunction(() => document.querySelectorAll('#board .tile.pending').length >= 2, { timeout: 8000 });
+  await page.waitForFunction(() => document.querySelectorAll('#board .tile.pending').length === 0, { timeout: 6000 });
+  console.log('OK: auto-play submitted the word after ~3s');
 
   if (errors.length) fail('console/page errors: ' + errors.join(' | '));
   if (!process.exitCode) console.log('\nALL SMOKE CHECKS PASSED');

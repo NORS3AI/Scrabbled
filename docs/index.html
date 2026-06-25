@@ -56,9 +56,9 @@
           <div class="scoreboard" id="scoreboard"></div>
         </div>
         <div class="controls">
+          <button id="btn-play" class="btn btn-primary btn-play" title="Play">Play</button>
           <button id="btn-shuffle" class="btn" title="Shuffle rack">Shuffle</button>
           <button id="btn-swap" class="btn" title="Swap tiles / Recall">Swap</button>
-          <button id="btn-play" class="btn btn-primary" title="Play">Play</button>
           <button id="btn-powerups" class="btn" title="Use a power-up">Power-ups</button>
           <button id="btn-new" class="btn" title="New game">New Game</button>
         </div>
@@ -206,6 +206,13 @@
       <label class="check-row">
         <input type="checkbox" id="set-low-tiles" />
         <span><b>Show when the opponent has less than 7 tiles left.</b></span>
+      </label>
+      <label class="check-row">
+        <input type="checkbox" id="set-autoplay" />
+        <span>
+          <b>Auto-play after 3 seconds</b>
+          <small class="muted">Once you've placed a valid word, it plays itself after 3 seconds (unless you change it first).</small>
+        </span>
       </label>
 
       <h3 class="settings-head">Developer</h3>

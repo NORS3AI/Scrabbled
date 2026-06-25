@@ -167,7 +167,9 @@ body { display: flex; flex-direction: column; }
 .player-card .pts { font-weight: 800; flex: 0 0 auto; }
 .player-card .lowtiles { font-size: .62rem; opacity: .85; font-weight: 600; }
 
-.controls { display: flex; gap: .35rem; justify-content: flex-end; flex-wrap: wrap; flex: 1 1 auto; }
+.controls { display: flex; gap: .35rem; justify-content: flex-end; align-items: stretch; flex-wrap: wrap; flex: 1 1 auto; }
+/* Play is the primary action: first and much wider so it's easy to hit. */
+.controls .btn-play { flex: 2 1 auto; min-width: 120px; font-size: 1rem; font-weight: 800; }
 .btn {
   border: 1px solid var(--line); background: #fff; color: var(--ink);
   padding: .5rem .8rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: .9rem;
