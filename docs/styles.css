@@ -3,6 +3,8 @@
   --felt-dark: #195a44;
   --board-line: #0e4b38;
   --tile: #f0d9a8;
+  /* Tile look — overridden per theme (default: classic gold). */
+  --tile-bg: linear-gradient(180deg, #f6e6c2, #f0d9a8);
   --tile-edge: #c8a35f;
   --tile-text: #2b2118;
   --dl: #a9d6e5;
@@ -35,14 +37,18 @@ body {
 .muted { color: #6b7a83; }
 .small { font-size: .82rem; }
 
-/* Top bar */
+/* Body is a vertical stack: slim top bar + the app fills the rest. */
+body { display: flex; flex-direction: column; }
+
+/* Slim top bar — just the wallet + shortcut buttons, to give the board room. */
 .topbar {
+  flex: 0 0 auto;
   display: flex; align-items: center; justify-content: space-between;
-  padding: .6rem 1rem; background: rgba(0, 0, 0, .25); color: #fff;
-  position: sticky; top: 0; z-index: 5;
+  padding: .35rem .7rem; background: rgba(0, 0, 0, .28); color: #fff;
+  z-index: 5;
 }
-.brand { font-weight: 800; font-size: 1.25rem; letter-spacing: .5px; display: flex; align-items: center; gap: .5rem; }
-.wallet { display: flex; align-items: center; gap: .6rem; font-weight: 600; flex-wrap: wrap; justify-content: flex-end; }
+.brand { display: flex; align-items: center; }
+.wallet { display: flex; align-items: center; gap: .45rem; font-weight: 600; justify-content: flex-end; }
 .wallet .coin, .wallet .gem { background: rgba(255, 255, 255, .12); padding: .25rem .55rem; border-radius: 20px; font-size: .9rem; }
 .wallet .gem { position: relative; }
 /* Floating "+N" gem reward shown under the gem counter. */
@@ -76,41 +82,18 @@ body {
 }
 .logo-mark.small { width: 28px; height: 28px; font-size: 1.1rem; border-radius: 7px; }
 
-/* Layout: full-height column with the tile dock pinned to the bottom. */
+/* App fills the space under the top bar: a big centered board, then the dock. */
 .app {
-  display: flex; flex-direction: column;
-  height: calc(100dvh - 53px); /* viewport minus the top bar */
-  width: 100%;
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; width: 100%;
 }
-/* Mobile-first: scoreboard on top, board, history hidden. */
-.stage {
-  position: relative;
-  flex: 1; min-height: 0; display: flex; flex-direction: column;
-  padding: .45rem .6rem 0; gap: .45rem; align-items: center;
+/* The board gets all the room it can, always centered. */
+.board-wrap {
+  flex: 1 1 auto; min-height: 0;
+  display: grid; place-items: center; padding: .4rem .5rem 0;
 }
-.board-area {
-  display: flex; flex-direction: column; align-items: center; gap: .35rem;
-  min-width: 0; min-height: 0; height: 100%; width: 100%; flex: 1 1 auto;
-}
-.scoreboard { display: flex; gap: .5rem; width: 100%; max-width: min(94vw, 520px); flex: 0 0 auto; }
-.bag-info { flex: 0 0 auto; }
-.player-card {
-  flex: 1; background: var(--paper); border-radius: 10px; padding: .45rem .6rem;
-  display: flex; align-items: center; justify-content: space-between; box-shadow: var(--shadow);
-  border: 2px solid transparent; min-width: 0;
-}
-.player-card.active { border-color: var(--accent); }
-.player-card .name { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.player-card .pts { font-size: 1.4rem; font-weight: 800; flex: 0 0 auto; margin-left: .3rem; }
-.player-card .tag { font-size: .7rem; color: #fff; background: var(--primary); border-radius: 10px; padding: .05rem .4rem; margin-left: .3rem; }
-
-/* Board */
 .board {
-  /* Fill the space the scoreboard/dock leave, staying square. flex sizing here
-     (rather than a fixed height guess) keeps the board from overflowing onto
-     the dock when the dock grows — e.g. with the dev panel open. */
-  flex: 1 1 auto; min-height: 0; aspect-ratio: 1 / 1;
-  width: auto; max-width: min(94vw, 520px); max-height: 100%; margin: 0 auto;
+  height: min(100%, 96vw, 640px); aspect-ratio: 1 / 1; width: auto; max-width: 100%;
   display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr);
   gap: 2px; background: var(--board-line); padding: 4px; border-radius: 8px; box-shadow: var(--shadow);
 }
@@ -131,7 +114,7 @@ body {
 /* Tiles */
 .tile {
   position: absolute; inset: 1px; border-radius: 4px;
-  background: linear-gradient(180deg, #f6e6c2, var(--tile));
+  background: var(--tile-bg);
   border: 1px solid var(--tile-edge); color: var(--tile-text);
   display: grid; place-items: center; font-weight: 800; box-shadow: 0 1px 2px rgba(0, 0, 0, .25);
   cursor: grab; touch-action: none;
@@ -145,19 +128,18 @@ body {
 .tile.lastmove { box-shadow: 0 0 0 2px var(--accent), 0 0 8px 2px rgba(233, 185, 73, .85); z-index: 2; }
 .tile.ghost { position: fixed; inset: auto; width: 40px; height: 40px; z-index: 50; pointer-events: none; opacity: .92; }
 
-/* Bottom dock: the tile rack + controls. Smaller, and blends with the page's
-   green background (no cream panel). */
+/* Bottom dock: rack on top, then an action bar (status + buttons). */
 .dock {
   flex: 0 0 auto; background: transparent;
-  border-top: none; box-shadow: none;
-  padding: .3rem .6rem calc(.4rem + env(safe-area-inset-bottom));
+  padding: .25rem .5rem calc(.4rem + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: .3rem;
 }
-.dock-inner { max-width: 430px; margin: 0 auto; display: flex; flex-direction: column; gap: .35rem; }
+#dev-panel, #armed-banner, #message { max-width: 720px; margin-left: auto; margin-right: auto; width: 100%; }
 .rack {
   display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px;
   background: var(--felt-dark); padding: 6px; border-radius: 10px; min-height: 42px;
-  width: 100%; max-width: 340px; margin: 0 auto;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .3);
+  width: 100%; max-width: 360px; margin: 0 auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
 }
 .rack.center { max-width: 340px; margin: .6rem auto; }
 .rack .slot { position: relative; aspect-ratio: 1 / 1; border-radius: 5px; background: rgba(0, 0, 0, .18); }
@@ -165,7 +147,27 @@ body {
 .rack .slot.selected .tile { transform: translateY(-6px); box-shadow: 0 0 0 2px var(--accent), 0 4px 8px rgba(0, 0, 0, .35); }
 .rack .slot.swap-pick .tile { box-shadow: 0 0 0 3px var(--tw); }
 
-.controls { display: flex; gap: .4rem; justify-content: center; flex-wrap: wrap; }
+/* Action bar: bag + scores on the left, buttons on the right. */
+.actionbar {
+  display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+  width: 100%; max-width: 760px; margin: 0 auto; padding: 0 .2rem;
+}
+.status { display: flex; align-items: center; gap: .6rem; color: #fff; flex: 0 0 auto; }
+.bag { display: flex; flex-direction: column; align-items: center; line-height: 1.05; }
+.bag b { font-size: 1.05rem; font-weight: 800; }
+.bag span { font-size: .58rem; opacity: .85; }
+.scoreboard { display: flex; flex-direction: column; gap: .2rem; min-width: 110px; }
+.player-card {
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  background: rgba(255, 255, 255, .12); border-radius: 6px; padding: .1rem .45rem;
+  border: 2px solid transparent; font-size: .8rem; color: #fff; min-width: 0;
+}
+.player-card.active { border-color: var(--accent); background: rgba(233, 185, 73, .22); }
+.player-card .name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-card .pts { font-weight: 800; flex: 0 0 auto; }
+.player-card .lowtiles { font-size: .62rem; opacity: .85; font-weight: 600; }
+
+.controls { display: flex; gap: .35rem; justify-content: flex-end; flex-wrap: wrap; flex: 1 1 auto; }
 .btn {
   border: 1px solid var(--line); background: #fff; color: var(--ink);
   padding: .5rem .8rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: .9rem;
@@ -175,8 +177,28 @@ body {
 .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
 .btn-primary:hover { background: var(--felt-dark); }
 .btn-light { background: var(--accent); border-color: var(--accent); color: #3a2c05; }
-.btn-icon { padding: .4rem .6rem; font-size: 1rem; line-height: 1; }
+.btn-icon { padding: .4rem .55rem; font-size: 1rem; line-height: 1; }
 .btn-small { padding: .3rem .55rem; font-size: .8rem; }
+.btn-block { display: block; width: 100%; margin-top: .5rem; }
+.btn-danger { background: #c0392b; color: #fff; border-color: #c0392b; }
+.btn-danger:hover { background: #a5311f; }
+.controls .btn { padding: .5rem .7rem; }
+
+/* Home / new-game screen */
+.home-card { text-align: left; max-height: 92vh; overflow-y: auto; }
+.home-logo { display: flex; flex-direction: column; align-items: center; gap: .2rem; margin-bottom: .6rem; }
+.home-logo h1 { margin: .1rem 0 0; }
+.select { width: 100%; padding: .55rem .6rem; border-radius: 8px; border: 1px solid var(--line); background: #fff; font-weight: 600; font-size: .95rem; }
+.home-stats { margin-top: 1rem; border-top: 1px solid var(--line); padding-top: .5rem; }
+.home-stats h2 { font-size: 1rem; margin: .2rem 0 .4rem; }
+.home-stat-row { display: flex; justify-content: space-between; padding: .12rem 0; font-size: .9rem; }
+.home-stat-row .k { color: #6b7a83; }
+.home-stat-row .v { font-weight: 700; }
+
+/* Settings sections */
+.settings-head { margin: 1rem 0 .3rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; color: #6b7a83; border-bottom: 1px solid var(--line); padding-bottom: .2rem; }
+.app-version { display: block; width: 100%; margin-top: 1.1rem; background: none; border: none; color: #6b7a83; font-size: .8rem; cursor: pointer; text-align: center; }
+.app-version:hover { color: var(--primary); text-decoration: underline; }
 
 /* Developer panel (in the dock, above the message line) */
 .dev-panel { background: #fff7e0; border: 1px dashed var(--tile-edge); border-radius: 8px; padding: .4rem .55rem; }
@@ -283,22 +305,6 @@ body {
 .message.error { color: #ff9e92; }
 .message.ok { color: #a7e8c6; }
 
-/* History: a compact, grey, in-flow right column on tablet/desktop, collapsible
-   from view. Hidden by default; shown when .app has .history-open (>=820px). */
-.history-wrap {
-  display: none;
-  background: #d4d8d5; color: #2b332f; border-radius: 10px; padding: .55rem .7rem;
-  box-shadow: var(--shadow);
-  width: 200px; flex: 0 0 200px; height: 100%; overflow: hidden; flex-direction: column;
-}
-.history-head { display: flex; align-items: center; justify-content: space-between; gap: .4rem; }
-.history-wrap h2 { margin: .1rem 0 .4rem; font-size: .85rem; }
-.history { margin: 0; padding-left: 1rem; overflow-y: auto; font-size: .78rem; flex: 1 1 auto; }
-.history li { margin-bottom: .35rem; }
-.history .hl-word { font-weight: 700; }
-.history .hl-pts { color: var(--primary); font-weight: 700; }
-.bag-info { color: rgba(255, 255, 255, .85); font-size: .8rem; }
-
 /* Tile placement animation (used when the computer plays, one tile at a time) */
 @keyframes dropIn {
   0% { transform: scale(1.35) translateY(-10px); opacity: 0; }
@@ -330,45 +336,13 @@ body {
 .spinner { width: 34px; height: 34px; border: 4px solid rgba(0, 0, 0, .15); border-top-color: var(--primary); border-radius: 50%; margin: 1rem auto 0; animation: spin 1s linear infinite; }
 .spinner.small { width: 16px; height: 16px; border-width: 3px; margin: 0; display: inline-block; vertical-align: middle; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.thinking { position: fixed; bottom: 172px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, .8); color: #fff; padding: .5rem 1rem; border-radius: 20px; z-index: 15; font-size: .9rem; }
+.thinking { position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, .8); color: #fff; padding: .5rem 1rem; border-radius: 20px; z-index: 15; font-size: .9rem; }
 
-/* Tablet/desktop: a 3-column grid keeps the board centred in the viewport
-   (equal minmax(0,1fr) gutters), with the scoreboard hugging its left and the
-   history column hugging its right. The board stays centred whether or not
-   history is open. */
-@media (min-width: 860px) {
-  .stage {
-    display: grid;
-    /* Explicit centre column (the board) with equal flexible gutters keeps the
-       board centred in the viewport. A definite centre size is required because
-       the board's width is flexible (height-driven) and an `auto` column would
-       collapse and let the board overflow. */
-    grid-template-columns: minmax(0, 1fr) min(92vw, 520px) minmax(0, 1fr);
-    align-items: start; gap: 0; padding: .6rem 1rem 0;
-  }
-  .scoreboard {
-    grid-column: 1; justify-self: end; align-self: start;
-    flex-direction: column; width: 150px; max-width: 150px; margin-right: 1rem;
-  }
-  .board-area { grid-column: 2; width: 100%; height: 100%; }
-  .board { max-width: 100%; }
-  .history-wrap { grid-column: 3; justify-self: start; margin-left: 1rem; }
-  .app.history-open .history-wrap { display: flex; }
-}
-/* Hide the history toggle where the column can't be shown. */
-@media (max-width: 859px) {
-  .hist-toggle { display: none; }
-}
-@media (max-width: 480px) {
-  .controls { gap: .35rem; }
-  .controls .btn { flex: 1 1 30%; padding: .55rem .3rem; font-size: .85rem; }
-  .wallet { gap: .5rem; }
+/* Narrow phones: stack the action bar (status above the buttons) and shrink. */
+@media (max-width: 560px) {
+  .actionbar { flex-direction: column; align-items: stretch; gap: .35rem; }
+  .status { justify-content: center; }
+  .controls { justify-content: center; }
+  .controls .btn { flex: 1 1 0; min-width: 60px; padding: .5rem .3rem; font-size: .82rem; }
   .wallet .coin, .wallet .gem { padding: .2rem .4rem; font-size: .82rem; }
-  .wallet .btn { padding: .4rem .6rem; }
-  .brand { font-size: 1.1rem; }
-}
-/* Landscape phones / short screens: narrow the board column so the square board
-   (sized by height via flex) stays centred and the dock stays visible. */
-@media (max-height: 560px) {
-  .board-area { max-width: min(78vh, 94vw); }
 }
