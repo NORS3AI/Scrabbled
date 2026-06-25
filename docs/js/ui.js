@@ -38,6 +38,7 @@ let settings = { devPanel: false, historyOpen: true };
 let achTracker = newTracker();      // per-game achievement accumulator
 let armed = { multiplier: 0, multItem: null, extraTurn: false }; // armed power-ups
 let lastMove = new Set();            // board keys of the tiles the AI just played (gold highlight)
+let autoPlayTimer = null;            // pending auto-play (Settings → Gameplay)
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -98,6 +99,7 @@ function applyDevPanel() {
 function applySettings() {
   applyDevPanel();
   $('set-low-tiles').checked = !!settings.showOpponentLowTiles;
+  $('set-autoplay').checked = !!settings.autoPlay;
 }
 
 function openSettings() { applySettings(); renderThemePicker(); $('settings-dialog').classList.remove('hidden'); }
@@ -197,6 +199,7 @@ export function startNewGame(config) {
   selectedRackIndex = null;
   hint = null;
   busy = false;
+  clearAutoPlay();
   lastMove = new Set();
   achTracker = newTracker();
   armed = { multiplier: 0, multItem: null, extraTurn: false };
@@ -465,6 +468,7 @@ function recallAll() {
   pending = [];
   selectedRackIndex = null;
   hint = null;
+  clearAutoPlay();
   message('');
   render();
 }
@@ -473,20 +477,43 @@ function recallAll() {
 // formed (the main word and any cross words) with its own points so the bonus
 // from connecting to other words is visible.
 function livePreview() {
+  clearAutoPlay();
   if (pending.length === 0) { message(''); return; }
   const v = validateMove(game.board, pending.map((p) => ({ ...p })));
   if (v.valid) {
     const s = scoreMove(game.board, pending, v.words);
     const parts = s.breakdown.map((b) => `${b.word.toUpperCase()} ${b.score}`).join(' + ');
     const plus = s.breakdown.length > 1 ? `${parts} = ` : '';
-    message(`${plus}${s.score}${s.bingo ? ' +50 bingo!' : ''}`, 'ok');
+    let msg = `${plus}${s.score}${s.bingo ? ' +50 bingo!' : ''}`;
+    if (settings.autoPlay && isHumanTurn() && !busy) {
+      scheduleAutoPlay();
+      msg += ' · auto-playing in 3s…';
+    }
+    message(msg, 'ok');
   } else {
     message(v.error, '');
   }
 }
 
+// Auto-play (opt-in): 3s after a valid word is on the board, play it — unless
+// the player changes it first (every placement change reschedules/clears).
+function clearAutoPlay() {
+  if (autoPlayTimer) { clearTimeout(autoPlayTimer); autoPlayTimer = null; }
+}
+
+function scheduleAutoPlay() {
+  clearAutoPlay();
+  autoPlayTimer = setTimeout(() => {
+    autoPlayTimer = null;
+    if (!isHumanTurn() || busy || pending.length === 0) return;
+    const v = validateMove(game.board, pending.map((p) => ({ ...p })));
+    if (v.valid) commitPlay();
+  }, 3000);
+}
+
 function commitPlay() {
   if (!isHumanTurn() || pending.length === 0) return;
+  clearAutoPlay();
   const human = currentPlayer(game);
   const placement = pending.map((p) => ({ row: p.row, col: p.col, letter: p.letter, blank: p.blank }));
   const opts = {};
@@ -589,6 +616,7 @@ async function maybeRunAI() {
   const player = currentPlayer(game);
   if (player.type !== 'ai') { updateControls(); return; }
   busy = true;
+  clearAutoPlay();
   updateControls();
   $('thinking').classList.remove('hidden');
   // Yield so the "thinking" indicator paints before the (sync) search runs.
@@ -1063,6 +1091,11 @@ function bindControls() {
   $('set-low-tiles').addEventListener('change', (e) => {
     settings = setSettings({ showOpponentLowTiles: e.target.checked });
     if (game) render();
+  });
+  $('set-autoplay').addEventListener('change', (e) => {
+    settings = setSettings({ autoPlay: e.target.checked });
+    if (!settings.autoPlay) clearAutoPlay();
+    if (game) livePreview(); // reflect immediately (start/stop the countdown)
   });
   $('btn-delete-stats').addEventListener('click', () => $('confirm-dialog').classList.remove('hidden'));
   $('btn-confirm-no').addEventListener('click', () => $('confirm-dialog').classList.add('hidden'));

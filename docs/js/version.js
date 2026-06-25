@@ -2,9 +2,18 @@
 // top entry's version makes the "What's new" dialog pop once for returning
 // players. Keep entries short and player-facing.
 
-export const VERSION = 'v0.0.7-alpha';
+export const VERSION = 'v0.0.8-alpha';
 
 export const PATCH_NOTES = [
+  {
+    version: 'v0.0.8-alpha',
+    date: '2026-06-25',
+    title: 'Play-first & auto-play',
+    changes: [
+      'Play is now the first and widest button, so you can play the instant your word is down.',
+      'New Settings → Gameplay option: "Auto-play after 3 seconds" — once a valid word is on the board it plays itself after 3s, unless you change it first.',
+    ],
+  },
   {
     version: 'v0.0.7-alpha',
     date: '2026-06-25',
