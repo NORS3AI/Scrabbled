@@ -4,7 +4,7 @@ An ad-free, async turn-based word game (Scrabble / Words With Friends style) wit
 built-in chat, single-player and multiplayer, AI opponents, randomized board
 modes, and a gameplay-earned currency system.
 
-**Live build:** https://nors3ai.github.io/scrabbled/ (GitHub Pages, `main` → `/docs`)
+**Live build:** https://nors3ai.github.io/Scrabbled/ (GitHub Pages, `main` → `/docs`)
 
 ---
 

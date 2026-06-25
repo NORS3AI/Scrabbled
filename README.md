@@ -6,7 +6,7 @@ It runs **entirely in your browser**: no account, no server, no ads.
 
 ## ▶️ Play it now
 
-**https://nors3ai.github.io/scrabbled/**
+**https://nors3ai.github.io/Scrabbled/**
 
 > Hosted on GitHub Pages from `main` → `/docs`. The first load downloads the
 > SOWPODS word list (~2.6 MB) and then the game is fully offline-capable.

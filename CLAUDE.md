@@ -9,7 +9,7 @@ style). It is a **static, client-side app** hosted on **GitHub Pages** from
 `main` → `/docs`. There is no build step and no backend — the entire game runs in
 the browser.
 
-- Live site: https://nors3ai.github.io/scrabbled/
+- Live site: https://nors3ai.github.io/Scrabbled/
 - Hosting: GitHub Pages, source = `main` branch, `/docs` folder.
 - The deployed site **is** the `docs/` directory. Anything outside `docs/`
   (tests, `package.json`, this file, `Roadmap.md`) is tooling/docs and is not
