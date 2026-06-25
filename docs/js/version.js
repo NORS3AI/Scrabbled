@@ -2,9 +2,21 @@
 // top entry's version makes the "What's new" dialog pop once for returning
 // players. Keep entries short and player-facing.
 
-export const VERSION = 'v0.0.3-alpha';
+export const VERSION = 'v0.0.4-alpha';
 
 export const PATCH_NOTES = [
+  {
+    version: 'v0.0.4-alpha',
+    date: '2026-06-25',
+    title: 'Claim clarity & dev tools',
+    changes: [
+      'Achievements: ready-to-claim ones now sort to the top and are highlighted, and the 🏆 badge pulses so it\'s obvious what you can claim.',
+      'Unlock notifications are concise and fire once per achievement (first time only) — no more per-word spam.',
+      'Dev panel: quick +gems and +coins buttons (5 / 10 / 100 / 1000).',
+      'Coins will be spendable on cosmetic themes — tiles, stickers, and board colors — in a future update.',
+      'Fixed the dev "best word" preview tiles lingering on the board once you start placing; the preview now uses a clear dashed style.',
+    ],
+  },
   {
     version: 'v0.0.3-alpha',
     date: '2026-06-25',

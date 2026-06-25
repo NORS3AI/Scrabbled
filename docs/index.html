@@ -24,7 +24,7 @@
   <header class="topbar">
     <div class="brand"><span class="logo-mark small">S</span> Scrabbled</div>
     <div class="wallet">
-      <button id="btn-notes" class="ver-badge" title="Patch notes">v0.0.3-alpha</button>
+      <button id="btn-notes" class="ver-badge" title="Patch notes">v0.0.4-alpha</button>
       <span class="coin" title="Coins">🪙 <b id="wallet-coins">0</b></span>
       <span class="gem" title="Gems">💎 <b id="wallet-gems">0</b><span id="gem-gain" class="gem-gain"></span></span>
       <button id="btn-achievements" class="btn btn-icon ach-btn" title="Achievements" aria-label="Achievements">🏆<span id="ach-badge" class="badge hidden">0</span></button>
@@ -61,6 +61,20 @@
             <button id="btn-best" class="btn btn-small">Best word</button>
             <button id="btn-place-best" class="btn btn-small">Place on board</button>
             <span id="best-result" class="best-result">—</span>
+          </div>
+          <div class="dev-row">
+            <span class="dev-tag">+💎</span>
+            <button class="btn btn-small" data-gem="5">+5</button>
+            <button class="btn btn-small" data-gem="10">+10</button>
+            <button class="btn btn-small" data-gem="100">+100</button>
+            <button class="btn btn-small" data-gem="1000">+1000</button>
+          </div>
+          <div class="dev-row">
+            <span class="dev-tag">+🪙</span>
+            <button class="btn btn-small" data-coin="5">+5</button>
+            <button class="btn btn-small" data-coin="10">+10</button>
+            <button class="btn btn-small" data-coin="100">+100</button>
+            <button class="btn btn-small" data-coin="1000">+1000</button>
           </div>
         </div>
         <div id="armed-banner" class="armed-banner hidden"></div>
