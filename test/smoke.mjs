@@ -39,6 +39,14 @@ page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 
 try {
+  // Seed gems (for the shop) and two unlocked-but-unclaimed achievements
+  // (len3 = 5 gems, win = 20 gems) to exercise the claim flow.
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('scrabbled.wallet.v1', JSON.stringify({ coins: 0, gems: 300 }));
+      localStorage.setItem('scrabbled.achievements.v1', JSON.stringify({ unlocked: { len3: true, win: true }, claimed: {} }));
+    } catch { /* ignore */ }
+  });
   await page.goto(base, { waitUntil: 'networkidle' });
   // Patch notes auto-open for a first-time visitor; dismiss them.
   await page.waitForSelector('#notes-dialog:not(.hidden)', { timeout: 20000 });
@@ -80,6 +88,38 @@ try {
   await page.click('#btn-recall');
   const afterRecall = await page.$$eval('#board .tile.pending', (els) => els.length);
   if (afterRecall !== 0) fail('recall did not clear pending tiles'); else console.log('OK: recall works');
+
+  // Achievement badge reflects the two seeded claimable achievements.
+  const badge = await page.$eval('#ach-badge', (b) => (b.classList.contains('hidden') ? '' : b.textContent));
+  if (badge !== '2') fail(`expected claim badge "2", got "${badge}"`); else console.log('OK: claim badge shows 2');
+
+  // Achievements dialog lists the full catalogue.
+  await page.click('#btn-achievements');
+  await page.waitForSelector('#ach-dialog:not(.hidden)');
+  const achCount = await page.$$eval('#ach-body .ach-item', (els) => els.length);
+  if (achCount !== 44) fail(`expected 44 achievements, got ${achCount}`); else console.log('OK: achievements list renders (44)');
+
+  // Claim all -> gems go 300 + 5 + 20 = 325, badge clears.
+  await page.click('#btn-claim-all');
+  await page.waitForFunction(() => document.getElementById('wallet-gems').textContent === '325', { timeout: 4000 });
+  const badgeAfter = await page.$eval('#ach-badge', (b) => b.classList.contains('hidden'));
+  if (!badgeAfter) fail('claim badge did not clear after claim all'); else console.log('OK: claimed achievements -> +25 gems, badge cleared');
+  await page.click('#btn-ach-close');
+
+  // Shop: buy a Best-Word Hint (have seeded gems).
+  await page.click('#btn-shop');
+  await page.waitForSelector('#shop-dialog:not(.hidden)');
+  await page.click('[data-buy="hint"]');
+  const owned = await page.$eval('[data-buy="hint"]', (b) => b.closest('.shop-card').querySelector('.shop-own').textContent);
+  if (!/Owned: 1/.test(owned)) fail(`hint not purchased, saw "${owned}"`); else console.log('OK: bought a power-up in the shop');
+  await page.click('#btn-shop-close');
+
+  // Use the Hint power-up; it should highlight the best word on the board.
+  await page.click('#btn-powerups');
+  await page.waitForSelector('#powerups-dialog:not(.hidden)');
+  await page.click('[data-use="hint"]');
+  await page.waitForFunction(() => document.querySelectorAll('.cell .tile.hint').length >= 1, { timeout: 8000 });
+  console.log('OK: used Hint power-up (best word highlighted)');
 
   // Pass the turn so the computer plays; it should drop tiles on the board.
   await page.click('#btn-pass');
