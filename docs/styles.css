@@ -92,11 +92,37 @@ body { display: flex; flex-direction: column; }
   flex: 1 1 auto; min-height: 0;
   display: grid; place-items: center; padding: .4rem .5rem 0;
 }
+/* A square stage sized to the board, so the floating history panel can anchor
+   to the board's corner (and never push the board around). */
+.board-stage { position: relative; height: min(100%, 96vw, 640px); aspect-ratio: 1 / 1; max-width: 100%; }
 .board {
-  height: min(100%, 96vw, 640px); aspect-ratio: 1 / 1; width: auto; max-width: 100%;
+  width: 100%; height: 100%;
   display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr);
   gap: 2px; background: var(--board-line); padding: 4px; border-radius: 8px; box-shadow: var(--shadow);
 }
+
+/* Floating, collapsible move-history panel — hovers over the board's top-right
+   with a drop shadow; collapsing shrinks it to just its header (never hides). */
+.history-panel {
+  position: absolute; top: 6px; right: 6px; z-index: 4;
+  width: 142px; max-height: 48%;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: rgba(255, 255, 255, .93); color: #21303b;
+  border-radius: 10px; box-shadow: 0 6px 18px rgba(0, 0, 0, .5);
+}
+.history-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: .4rem;
+  background: #21303b; color: #fff; border: none; cursor: pointer;
+  padding: .28rem .5rem; font-weight: 700; font-size: .74rem; flex: 0 0 auto;
+}
+.history-toggle .chev { transition: transform .15s ease; }
+.history-panel.collapsed { width: auto; }
+.history-panel.collapsed .history-list { display: none; }
+.history-panel.collapsed .chev { transform: rotate(-90deg); }
+.history-list { margin: 0; padding: .3rem .35rem .35rem 1.15rem; overflow-y: auto; font-size: .7rem; flex: 1 1 auto; }
+.history-list li { margin-bottom: .2rem; }
+.history-list .hl-word { font-weight: 700; }
+.history-list .hl-pts { color: var(--primary); font-weight: 700; }
 .cell {
   position: relative; background: var(--felt); border-radius: 3px;
   display: grid; place-items: center; font-size: .5rem; font-weight: 700; color: rgba(255, 255, 255, .85);

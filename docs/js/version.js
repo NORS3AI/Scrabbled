@@ -2,9 +2,19 @@
 // top entry's version makes the "What's new" dialog pop once for returning
 // players. Keep entries short and player-facing.
 
-export const VERSION = 'v0.0.8-alpha';
+export const VERSION = 'v0.0.9-alpha';
 
 export const PATCH_NOTES = [
+  {
+    version: 'v0.0.9-alpha',
+    date: '2026-06-25',
+    title: 'Move history is back + fixes',
+    changes: [
+      'The move history is back as a small panel that hovers over the board (with a drop shadow) — tap "Moves" to collapse/expand it. It never pushes the board around.',
+      'Fixed: choosing a Randomized board for a new game now actually randomizes it (on a replay it could fall back to the standard board).',
+      'The most recent move is highlighted gold — when it\'s your turn you can see exactly where the opponent just played; the previous word returns to normal.',
+    ],
+  },
   {
     version: 'v0.0.8-alpha',
     date: '2026-06-25',
