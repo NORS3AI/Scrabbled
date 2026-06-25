@@ -6,24 +6,90 @@ import { BOARD_SIZE, LETTER_POINTS, RACK_SIZE } from './constants.js';
 import { newGame, currentPlayer, submitPlay, swapTiles, passTurn } from './game.js';
 import { validateMove } from './validation.js';
 import { scoreMove } from './scoring.js';
-import { chooseMove } from './ai.js';
+import { chooseMove, bestMove } from './ai.js';
 import { DIFFICULTIES } from './ai.js';
-import { getWallet, addCurrency, recordGame, rewardForGame } from './store.js';
+import {
+  getWallet, addCurrency, recordGame, rewardForGame, getSeenVersion, setSeenVersion,
+  getSettings, setSettings,
+} from './store.js';
+import { VERSION, PATCH_NOTES } from './version.js';
 
 const PREM_LABEL = { DL: 'DL', TL: 'TL', DW: 'DW', TW: 'TW' };
 
 let game = null;
 let pending = [];           // [{row,col,letter,blank,rackIndex}]
+let aiAnim = [];            // tiles the AI is currently placing (animated overlay)
+let aiAnimLastKey = -1;     // which animated tile should play the drop-in animation
 let selectedRackIndex = null;
 let drag = null;            // active drag state
 let busy = false;           // AI thinking / animating -> lock input
+let hint = null;            // dev-panel best-word highlight {cells, word, score}
+let settings = { devPanel: false };
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const $ = (id) => document.getElementById(id);
 
 export function startUI() {
   bindControls();
   refreshWallet();
+  settings = getSettings();
+  applySettings();
+  // Show "What's new" once per release.
+  if (getSeenVersion() !== VERSION) openNotes();
 }
+
+// ---------- Settings & dev panel ----------
+function applySettings() {
+  $('dev-panel').classList.toggle('hidden', !settings.devPanel);
+  $('set-dev').checked = !!settings.devPanel;
+  if (!settings.devPanel) clearHint();
+}
+
+function openSettings() { applySettings(); $('settings-dialog').classList.remove('hidden'); }
+function closeSettings() { $('settings-dialog').classList.add('hidden'); }
+
+function clearHint() {
+  if (hint) { hint = null; renderBoard(); }
+  $('best-result').textContent = '—';
+}
+
+// Coordinate label like "H8" (column letter, row number) for a cell.
+function coordLabel(row, col) {
+  return String.fromCharCode(65 + col) + (row + 1);
+}
+
+// Compute and show the best word the human can currently play.
+function showBestWord() {
+  if (!settings.devPanel) return;
+  if (!isHumanTurn()) { $('best-result').textContent = 'Wait for your turn'; return; }
+  $('best-result').textContent = 'Searching…';
+  // Defer so the label paints before the (synchronous) search.
+  setTimeout(() => {
+    const player = currentPlayer(game);
+    const res = bestMove(game.board, player.rack);
+    if (!res) { $('best-result').textContent = 'No move available — try swapping.'; hint = null; renderBoard(); return; }
+    const first = res.move.placement.slice().sort((a, b) => (a.row - b.row) || (a.col - b.col))[0];
+    hint = { cells: res.move.placement.map((p) => ({ row: p.row, col: p.col, letter: p.letter })), word: res.word };
+    $('best-result').textContent = `${res.word.toUpperCase()} — ${res.score} pts @ ${coordLabel(first.row, first.col)}`;
+    renderBoard();
+  }, 20);
+}
+
+// ---------- Patch notes ----------
+export function openNotes() {
+  const body = $('notes-body');
+  body.innerHTML = PATCH_NOTES.map((n) => `
+    <div class="notes-entry">
+      <h3>${escapeHtml(n.version)}${n.title ? ' — ' + escapeHtml(n.title) : ''}</h3>
+      <div class="when">${escapeHtml(n.date || '')}</div>
+      <ul>${n.changes.map((c) => `<li>${escapeHtml(c)}</li>`).join('')}</ul>
+    </div>`).join('');
+  $('notes-dialog').classList.remove('hidden');
+  setSeenVersion(VERSION);
+}
+
+function closeNotes() { $('notes-dialog').classList.add('hidden'); }
 
 // ---------- New game ----------
 export function startNewGame(config) {
@@ -31,6 +97,7 @@ export function startNewGame(config) {
   game = newGame({ mode: config.mode, players });
   pending = [];
   selectedRackIndex = null;
+  hint = null;
   busy = false;
   render();
   maybeRunAI();
@@ -83,6 +150,8 @@ function renderBoard() {
   const boardEl = $('board');
   boardEl.innerHTML = '';
   const pendingMap = new Map(pending.map((p) => [p.row * BOARD_SIZE + p.col, p]));
+  const aiMap = new Map(aiAnim.map((p) => [p.row * BOARD_SIZE + p.col, p]));
+  const hintMap = new Map((hint ? hint.cells : []).map((p) => [p.row * BOARD_SIZE + p.col, p]));
   for (let r = 0; r < BOARD_SIZE; r++) {
     for (let c = 0; c < BOARD_SIZE; c++) {
       const cell = document.createElement('div');
@@ -90,12 +159,24 @@ function renderBoard() {
       cell.className = 'cell' + premClass(prem);
       cell.dataset.row = r;
       cell.dataset.col = c;
+      const key = r * BOARD_SIZE + c;
       const existing = game.board.cells[r][c];
-      const pend = pendingMap.get(r * BOARD_SIZE + c);
+      const pend = pendingMap.get(key);
+      const ai = aiMap.get(key);
       if (existing) {
         cell.appendChild(tileEl(existing.letter, existing.blank, 'locked'));
+      } else if (ai) {
+        // The most recently placed AI tile gets the drop-in animation.
+        cell.appendChild(tileEl(ai.letter, ai.blank, key === aiAnimLastKey ? 'locked placing' : 'locked'));
       } else if (pend) {
         cell.appendChild(tileEl(pend.letter, pend.blank, 'pending'));
+      } else if (hintMap.has(key)) {
+        // Dev-panel best-word highlight: faint letter on an empty square.
+        cell.classList.add('hint');
+        const span = document.createElement('span');
+        span.className = 'hint-letter';
+        span.textContent = hintMap.get(key).letter.toUpperCase();
+        cell.appendChild(span);
       } else if (prem && prem !== 'STAR' && PREM_LABEL[prem]) {
         const span = document.createElement('span');
         span.className = 'prem';
@@ -227,6 +308,7 @@ function recallAt(row, col) {
 function recallAll() {
   pending = [];
   selectedRackIndex = null;
+  hint = null;
   message('');
   render();
 }
@@ -251,6 +333,7 @@ function commitPlay() {
   const word = res.words.find((w) => w.isMain) || res.words[0];
   pending = [];
   selectedRackIndex = null;
+  hint = null;
   message(`You played ${word.word.toUpperCase()} for ${res.score}${res.bingo ? ' — BINGO!' : ''}`, 'ok');
   render();
   if (checkEnd()) return;
@@ -277,7 +360,7 @@ function doSwap(tiles) {
 }
 
 // ---------- AI turn ----------
-function maybeRunAI() {
+async function maybeRunAI() {
   if (game.status !== 'active') return;
   const player = currentPlayer(game);
   if (player.type !== 'ai') { updateControls(); return; }
@@ -285,31 +368,46 @@ function maybeRunAI() {
   updateControls();
   $('thinking').classList.remove('hidden');
   // Yield so the "thinking" indicator paints before the (sync) search runs.
-  setTimeout(() => {
-    requestAnimationFrame(() => {
-      runAITurn(player);
-      $('thinking').classList.add('hidden');
-      busy = false;
-      render();
-      if (!checkEnd()) maybeRunAI(); // in case of consecutive AI players
-    });
-  }, 450);
-}
+  await sleep(420);
+  const move = await new Promise((resolve) => {
+    requestAnimationFrame(() => resolve(chooseMove(game.board, player.rack, player.difficulty)));
+  });
+  $('thinking').classList.add('hidden');
 
-function runAITurn(player) {
-  const move = chooseMove(game.board, player.rack, player.difficulty);
   if (move) {
-    submitPlay(game, move.placement.map((p) => ({ row: p.row, col: p.col, letter: p.letter, blank: p.blank })));
-    const w = move.words.find((x) => x.isMain) || move.words[0];
-    message(`${player.name} played ${w.word.toUpperCase()} for ${move.score}.`, '');
+    await animateAIPlay(player, move);
   } else if (game.bag.length >= RACK_SIZE) {
-    // No move: swap up to the whole rack.
     swapTiles(game, player.rack.slice(0, Math.min(RACK_SIZE, player.rack.length)));
     message(`${player.name} swapped tiles.`, '');
   } else {
     passTurn(game);
     message(`${player.name} passed.`, '');
   }
+
+  busy = false;
+  render();
+  if (!checkEnd()) maybeRunAI(); // in case of consecutive AI players
+}
+
+// Place the AI's tiles one at a time with a smooth drop-in, then commit.
+async function animateAIPlay(player, move) {
+  const w = move.words.find((x) => x.isMain) || move.words[0];
+  message(`${player.name} is playing…`, '');
+  // Order tiles along the word (top-left to bottom-right) for a natural sweep.
+  const tiles = [...move.placement].sort((a, b) => (a.row - b.row) || (a.col - b.col));
+  aiAnim = [];
+  for (const t of tiles) {
+    aiAnim.push({ row: t.row, col: t.col, letter: t.letter, blank: t.blank });
+    aiAnimLastKey = t.row * BOARD_SIZE + t.col;
+    renderBoard();
+    await sleep(260);
+  }
+  await sleep(160);
+  // Commit the move for real, then clear the animation overlay.
+  submitPlay(game, move.placement.map((p) => ({ row: p.row, col: p.col, letter: p.letter, blank: p.blank })));
+  aiAnim = [];
+  aiAnimLastKey = -1;
+  message(`${player.name} played ${w.word.toUpperCase()} for ${move.score}${move.bingo ? ' — BINGO!' : ''}.`, '');
 }
 
 // ---------- End game ----------
@@ -386,6 +484,15 @@ function bindControls() {
   $('btn-pass').addEventListener('click', doPass);
   $('btn-swap').addEventListener('click', openSwapDialog);
   $('btn-again').addEventListener('click', () => { $('end-dialog').classList.add('hidden'); openNewDialog(); });
+  $('btn-notes').addEventListener('click', openNotes);
+  $('btn-notes-close').addEventListener('click', closeNotes);
+  $('btn-settings').addEventListener('click', openSettings);
+  $('btn-settings-close').addEventListener('click', closeSettings);
+  $('set-dev').addEventListener('change', (e) => {
+    settings = setSettings({ devPanel: e.target.checked });
+    applySettings();
+  });
+  $('btn-best').addEventListener('click', showBestWord);
 
   const board = $('board');
   const rack = $('rack');

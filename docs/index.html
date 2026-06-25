@@ -24,21 +24,38 @@
   <header class="topbar">
     <div class="brand"><span class="logo-mark small">S</span> Scrabbled</div>
     <div class="wallet">
+      <button id="btn-notes" class="ver-badge" title="Patch notes">v0.0.1-alpha</button>
       <span class="coin" title="Coins">🪙 <b id="wallet-coins">0</b></span>
       <span class="gem" title="Gems">💎 <b id="wallet-gems">0</b></span>
+      <button id="btn-settings" class="btn btn-icon" title="Settings" aria-label="Settings">⚙</button>
       <button id="btn-new" class="btn btn-light">New Game</button>
     </div>
   </header>
 
   <main id="app" class="app hidden">
-    <section class="board-area">
-      <div class="scoreboard" id="scoreboard"></div>
-      <div id="board" class="board" aria-label="Game board"></div>
-      <div class="bag-info"><span id="bag-count">100</span> tiles in bag</div>
-    </section>
+    <div class="stage">
+      <section class="board-area">
+        <div class="scoreboard" id="scoreboard"></div>
+        <div id="board" class="board" aria-label="Game board"></div>
+        <div class="bag-info"><span id="bag-count">100</span> tiles in bag</div>
+      </section>
 
-    <aside class="side">
-      <div class="rack-wrap">
+      <aside class="history-wrap">
+        <h2>Move history</h2>
+        <ol id="history" class="history"></ol>
+      </aside>
+    </div>
+
+    <section class="dock">
+      <div class="dock-inner">
+        <div id="dev-panel" class="dev-panel hidden">
+          <div class="dev-row">
+            <span class="dev-tag">DEV</span>
+            <button id="btn-best" class="btn btn-small">Best word</button>
+            <span id="best-result" class="best-result">—</span>
+          </div>
+        </div>
+        <div id="message" class="message" role="status"></div>
         <div id="rack" class="rack" aria-label="Your tiles"></div>
         <div class="controls">
           <button id="btn-play" class="btn btn-primary">Play</button>
@@ -47,14 +64,8 @@
           <button id="btn-swap" class="btn">Swap</button>
           <button id="btn-pass" class="btn">Pass</button>
         </div>
-        <div id="message" class="message" role="status"></div>
       </div>
-
-      <div class="history-wrap">
-        <h2>Move history</h2>
-        <ol id="history" class="history"></ol>
-      </div>
-    </aside>
+    </section>
   </main>
 
   <!-- New game dialog -->
@@ -116,6 +127,34 @@
       <div id="end-body"></div>
       <div class="dialog-actions">
         <button id="btn-again" class="btn btn-primary">Play again</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div id="settings-dialog" class="overlay hidden">
+    <div class="overlay-card wide">
+      <h2>Settings</h2>
+      <label class="check-row">
+        <input type="checkbox" id="set-dev" />
+        <span>
+          <b>Developer panel</b>
+          <small class="muted">Shows the best word you can play and its point value. Affects you only — never the computer.</small>
+        </span>
+      </label>
+      <div class="dialog-actions">
+        <button id="btn-settings-close" class="btn btn-primary">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Patch notes -->
+  <div id="notes-dialog" class="overlay hidden">
+    <div class="overlay-card wide">
+      <h2>What's new</h2>
+      <div id="notes-body" class="notes-body"></div>
+      <div class="dialog-actions">
+        <button id="btn-notes-close" class="btn btn-primary">Got it</button>
       </div>
     </div>
   </div>

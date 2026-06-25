@@ -40,7 +40,12 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 
 try {
   await page.goto(base, { waitUntil: 'networkidle' });
-  // New-game dialog should appear once the dictionary has loaded.
+  // Patch notes auto-open for a first-time visitor; dismiss them.
+  await page.waitForSelector('#notes-dialog:not(.hidden)', { timeout: 20000 });
+  console.log('OK: patch notes shown on first load');
+  await page.click('#btn-notes-close');
+
+  // New-game dialog should be present once the dictionary has loaded.
   await page.waitForSelector('#new-dialog:not(.hidden)', { timeout: 20000 });
   console.log('OK: app booted, dictionary loaded');
 
@@ -75,6 +80,11 @@ try {
   await page.click('#btn-recall');
   const afterRecall = await page.$$eval('#board .tile.pending', (els) => els.length);
   if (afterRecall !== 0) fail('recall did not clear pending tiles'); else console.log('OK: recall works');
+
+  // Pass the turn so the computer plays; it should drop tiles on the board.
+  await page.click('#btn-pass');
+  await page.waitForFunction(() => document.querySelectorAll('#board .tile.locked').length >= 2, { timeout: 15000 });
+  console.log('OK: computer played tiles onto the board');
 
   if (errors.length) fail('console/page errors: ' + errors.join(' | '));
   if (!process.exitCode) console.log('\nALL SMOKE CHECKS PASSED');

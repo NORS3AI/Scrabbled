@@ -5,6 +5,9 @@
 
 const WALLET_KEY = 'scrabbled.wallet.v1';
 const STATS_KEY = 'scrabbled.stats.v1';
+const SEEN_VERSION_KEY = 'scrabbled.seenVersion';
+const SETTINGS_KEY = 'scrabbled.settings.v1';
+const DEFAULT_SETTINGS = { devPanel: false };
 
 const DEFAULT_WALLET = { coins: 0, gems: 0 };
 const DEFAULT_STATS = { games: 0, wins: 0, losses: 0, bestWord: null, bestWordScore: 0, totalScore: 0 };
@@ -24,6 +27,22 @@ function write(key, value) {
 
 export function getWallet() { return read(WALLET_KEY, DEFAULT_WALLET); }
 export function getStats() { return read(STATS_KEY, DEFAULT_STATS); }
+
+// Track the last app version whose patch notes the player has seen, so the
+// "What's new" dialog only auto-opens once per release.
+export function getSeenVersion() {
+  try { return localStorage.getItem(SEEN_VERSION_KEY) || null; } catch { return null; }
+}
+export function setSeenVersion(version) {
+  try { localStorage.setItem(SEEN_VERSION_KEY, version); } catch { /* ignore */ }
+}
+
+export function getSettings() { return read(SETTINGS_KEY, DEFAULT_SETTINGS); }
+export function setSettings(patch) {
+  const s = { ...getSettings(), ...patch };
+  write(SETTINGS_KEY, s);
+  return s;
+}
 
 export function addCurrency({ coins = 0, gems = 0 }) {
   const w = getWallet();
