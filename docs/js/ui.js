@@ -14,7 +14,7 @@ import {
   getAchievements, unlockAchievements, claimAchievement,
   getInventory, buyItem, useItem,
   getThemes, buyTheme, selectTheme,
-  saveGame, loadGame, clearSavedGame, storageAvailable,
+  saveGame, loadGame, clearSavedGame, storageAvailable, getStorageError,
 } from './store.js';
 import { THEMES, THEME_BY_ID } from './themes.js';
 import {
@@ -53,7 +53,14 @@ export function startUI() {
   applySettings();
   $('btn-app-version').textContent = `Scrabbled ${VERSION} · patch notes`;
   // Warn if the browser blocks storage (nothing can persist across a refresh).
-  if (!storageAvailable()) $('storage-warning').classList.remove('hidden');
+  if (!storageAvailable()) {
+    const reason = getStorageError() || 'unknown';
+    console.warn('[Scrabbled] Saved data is blocked by the browser:', reason,
+      '\nAllow site data/cookies for this page (Chrome: ⋮ → Settings → Privacy and security → Site settings → Cookies; or disable a cookie/privacy extension). The game still works this session, but progress won\'t survive a refresh.');
+    const det = document.getElementById('storage-detail');
+    if (det) det.textContent = `(details: ${reason})`;
+    $('storage-warning').classList.remove('hidden');
+  }
   $('btn-storage-dismiss').addEventListener('click', () => $('storage-warning').classList.add('hidden'));
   // Show "What's new" once per release.
   if (getSeenVersion() !== VERSION) openNotes();

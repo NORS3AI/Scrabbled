@@ -2,9 +2,27 @@
 // top entry's version makes the "What's new" dialog pop once for returning
 // players. Keep entries short and player-facing.
 
-export const VERSION = 'v0.0.12-alpha';
+export const VERSION = 'v0.0.14-alpha';
 
 export const PATCH_NOTES = [
+  {
+    version: 'v0.0.14-alpha',
+    date: '2026-06-25',
+    title: 'Coins & gems now save more reliably',
+    changes: [
+      'Added a cookie-based backup for your saved data. If something on your browser blocks site storage (localStorage) — a common reason coins, gems and achievements were resetting on refresh — the game now falls back to cookies so your progress is still kept.',
+      'The "saved data is blocked" warning now only appears when every storage method is blocked, so it should disappear for most people.',
+    ],
+  },
+  {
+    version: 'v0.0.13-alpha',
+    date: '2026-06-25',
+    title: 'Storage warning: more detail',
+    changes: [
+      'The "saved data is blocked" warning now covers Chrome and privacy extensions (not just Safari), and shows the exact reason — also logged to the browser console (open DevTools to see it).',
+      'Common causes in Chrome: a cookie/privacy extension (uBlock, Privacy Badger, Cookie AutoDelete), Brave Shields, or "Block all cookies" in site settings.',
+    ],
+  },
   {
     version: 'v0.0.12-alpha',
     date: '2026-06-25',

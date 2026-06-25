@@ -31,9 +31,63 @@ const DEFAULT_STATS = {
 // persistence on top of it.
 const memCache = new Map();
 
+// --- Persistence backend: localStorage first, cookies as a fallback ---
+// Some setups (privacy extensions, certain Chrome site-data settings) block
+// localStorage while still allowing cookies. We mirror to both, so progress
+// survives a refresh whenever *either* mechanism works. Cookies are capped near
+// 4KB, so the large saved-game blob is skipped for cookies (it only lives in
+// localStorage); the small wallet/stats/achievements data fits fine.
+const COOKIE_MAX = 3500;
+
+function cookieGet(name) {
+  try {
+    const prefix = encodeURIComponent(name) + '=';
+    for (const part of document.cookie.split('; ')) {
+      if (part.startsWith(prefix)) return decodeURIComponent(part.slice(prefix.length));
+    }
+  } catch { /* document.cookie can throw in sandboxed contexts */ }
+  return null;
+}
+
+function cookieSet(name, value) {
+  try {
+    const v = encodeURIComponent(value);
+    if (v.length > COOKIE_MAX) return false;
+    // 1-year expiry; SameSite=Lax keeps it on this first-party site.
+    document.cookie = `${encodeURIComponent(name)}=${v}; path=/; max-age=31536000; SameSite=Lax`;
+    return cookieGet(name) === value; // confirm it actually stuck
+  } catch {
+    return false;
+  }
+}
+
+function cookieRemove(name) {
+  try { document.cookie = `${encodeURIComponent(name)}=; path=/; max-age=0; SameSite=Lax`; } catch { /* ignore */ }
+}
+
+// Read a raw string for a key from whichever backend has it.
+function backendGet(key) {
+  try { const v = localStorage.getItem(key); if (v !== null) return v; } catch { /* fall through to cookie */ }
+  return cookieGet(key);
+}
+
+// Persist a raw string to every backend that will take it. Returns true if at
+// least one backend confirmed the write.
+function backendSet(key, val) {
+  let ok = false;
+  try { localStorage.setItem(key, val); ok = true; } catch { /* try cookie */ }
+  if (cookieSet(key, val)) ok = true;
+  return ok;
+}
+
+function backendRemove(key) {
+  try { localStorage.removeItem(key); } catch { /* ignore */ }
+  cookieRemove(key);
+}
+
 function read(key, fallback) {
   try {
-    let raw = memCache.has(key) ? memCache.get(key) : localStorage.getItem(key);
+    let raw = memCache.has(key) ? memCache.get(key) : backendGet(key);
     return raw ? { ...fallback, ...JSON.parse(raw) } : { ...fallback };
   } catch {
     return { ...fallback };
@@ -43,16 +97,14 @@ function read(key, fallback) {
 function write(key, value) {
   const serialized = JSON.stringify(value);
   memCache.set(key, serialized); // always succeeds; keeps the session consistent
-  try { localStorage.setItem(key, serialized); } catch { /* persistence best-effort */ }
+  backendSet(key, serialized);   // best-effort persistence across localStorage + cookies
 }
 
 // Re-write the whole in-memory cache to localStorage. A belt-and-suspenders
 // flush for browsers that defer/flake writes — runs when the tab is hidden or
 // unloaded so progress isn't lost if an earlier write didn't stick.
 function flushStorage() {
-  for (const [k, v] of memCache) {
-    try { localStorage.setItem(k, v); } catch { /* ignore */ }
-  }
+  for (const [k, v] of memCache) backendSet(k, v);
 }
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   window.addEventListener('pagehide', flushStorage);
@@ -62,20 +114,34 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   });
 }
 
-// True if localStorage can actually persist (write + read back). False in
-// Private Browsing / "Block All Cookies" / some in-app browsers — where nothing
-// can survive a refresh, no matter what we do.
+// True if localStorage can actually persist (write + read back). False when the
+// browser blocks site data — Private Browsing, "Block all cookies", a
+// cookie-blocking extension, or an in-app/sandboxed context. Captures the real
+// reason for diagnostics.
+let storageError = null;
 export function storageAvailable() {
+  storageError = null;
+  const k = '__scrabbled_probe__';
+  // Primary: localStorage.
   try {
-    const k = '__scrabbled_probe__';
     localStorage.setItem(k, '1');
     const ok = localStorage.getItem(k) === '1';
-    localStorage.removeItem(k);
-    return ok;
-  } catch {
-    return false;
+    try { localStorage.removeItem(k); } catch { /* cleanup is non-fatal */ }
+    if (ok) return true;
+    storageError = 'a localStorage write did not persist';
+  } catch (e) {
+    storageError = (e && e.name ? `${e.name}: ` : '') + (e && e.message ? e.message : 'localStorage is unavailable');
   }
+  // Fallback: cookies. If these persist, progress is still saved across refreshes.
+  if (cookieSet(k, '1')) {
+    cookieRemove(k);
+    return true;
+  }
+  storageError = (storageError ? storageError + '; ' : '') + 'cookies are also blocked';
+  return false;
 }
+
+export function getStorageError() { return storageError; }
 
 export function getWallet() { return read(WALLET_KEY, DEFAULT_WALLET); }
 export function getStats() { return read(STATS_KEY, DEFAULT_STATS); }
@@ -89,10 +155,11 @@ export function resetStats() {
 // Track the last app version whose patch notes the player has seen, so the
 // "What's new" dialog only auto-opens once per release.
 export function getSeenVersion() {
-  try { return localStorage.getItem(SEEN_VERSION_KEY) || null; } catch { return null; }
+  return backendGet(SEEN_VERSION_KEY) || null;
 }
 export function setSeenVersion(version) {
-  try { localStorage.setItem(SEEN_VERSION_KEY, version); } catch { /* ignore */ }
+  memCache.set(SEEN_VERSION_KEY, version);
+  backendSet(SEEN_VERSION_KEY, version);
 }
 
 export function getSettings() { return read(SETTINGS_KEY, DEFAULT_SETTINGS); }
@@ -192,7 +259,7 @@ export function saveGame(game) { write(GAME_KEY, game); }
 
 export function loadGame() {
   try {
-    const raw = memCache.has(GAME_KEY) ? memCache.get(GAME_KEY) : localStorage.getItem(GAME_KEY);
+    const raw = memCache.has(GAME_KEY) ? memCache.get(GAME_KEY) : backendGet(GAME_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -201,7 +268,7 @@ export function loadGame() {
 
 export function clearSavedGame() {
   memCache.delete(GAME_KEY);
-  try { localStorage.removeItem(GAME_KEY); } catch { /* ignore */ }
+  backendRemove(GAME_KEY);
 }
 
 export function addCurrency({ coins = 0, gems = 0 }) {
