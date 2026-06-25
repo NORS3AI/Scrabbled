@@ -181,6 +181,13 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('#board .tile.lastmove').length >= 2, { timeout: 15000 });
   console.log('OK: computer move highlighted gold (lastmove)');
 
+  // Move-history panel renders entries and collapses (not hides).
+  const histEntries = await page.$$eval('#history li', (els) => els.length);
+  if (histEntries < 1) fail('history panel has no entries'); else console.log('OK: move history renders');
+  await page.click('#btn-history-toggle');
+  const collapsed = await page.$eval('#history-panel', (el) => el.classList.contains('collapsed') && getComputedStyle(el).display !== 'none');
+  if (!collapsed) fail('history did not collapse (or got hidden)'); else console.log('OK: history collapses (stays visible)');
+
   // Resume on refresh: reload and the saved game should resume (no new-game dialog).
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForFunction(() => document.querySelectorAll('#board .tile.locked').length >= 2, { timeout: 12000 });

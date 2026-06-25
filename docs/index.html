@@ -35,7 +35,15 @@
 
   <main id="app" class="app hidden">
     <div class="board-wrap">
-      <div id="board" class="board" aria-label="Game board"></div>
+      <div class="board-stage">
+        <div id="board" class="board" aria-label="Game board"></div>
+        <aside id="history-panel" class="history-panel">
+          <button id="btn-history-toggle" class="history-toggle" title="Move history">
+            <span>Moves</span><span class="chev">▾</span>
+          </button>
+          <ol id="history" class="history-list"></ol>
+        </aside>
+      </div>
     </div>
 
     <section class="dock">

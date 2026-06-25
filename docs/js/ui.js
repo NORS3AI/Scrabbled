@@ -34,7 +34,7 @@ let selectedRackIndex = null;
 let drag = null;            // active drag state
 let busy = false;           // AI thinking / animating -> lock input
 let hint = null;            // dev-panel best-word highlight {cells, word, score}
-let settings = { devPanel: false, historyOpen: true };
+let settings = { devPanel: false, historyCollapsed: false, showOpponentLowTiles: false, autoPlay: false };
 let achTracker = newTracker();      // per-game achievement accumulator
 let armed = { multiplier: 0, multItem: null, extraTurn: false }; // armed power-ups
 let lastMove = new Set();            // board keys of the tiles the AI just played (gold highlight)
@@ -100,6 +100,16 @@ function applySettings() {
   applyDevPanel();
   $('set-low-tiles').checked = !!settings.showOpponentLowTiles;
   $('set-autoplay').checked = !!settings.autoPlay;
+  applyHistoryCollapsed();
+}
+
+function applyHistoryCollapsed() {
+  $('history-panel').classList.toggle('collapsed', !!settings.historyCollapsed);
+}
+
+function toggleHistoryCollapsed() {
+  settings = setSettings({ historyCollapsed: !settings.historyCollapsed });
+  applyHistoryCollapsed();
 }
 
 function openSettings() { applySettings(); renderThemePicker(); $('settings-dialog').classList.remove('hidden'); }
@@ -269,6 +279,7 @@ function render() {
   renderScoreboard();
   renderBoard();
   renderRack();
+  renderHistory();
   $('bag-count').textContent = game.bag.length;
   updateControls();
 }
@@ -536,7 +547,9 @@ function commitPlay() {
   pending = [];
   selectedRackIndex = null;
   hint = null;
-  lastMove = new Set(); // clear the computer's gold highlight now that you've moved
+  // Gold-highlight the move just made (yours), so the next player sees where it
+  // went; the computer's next move will replace it. Most recent move = gold.
+  lastMove = new Set(placement.map((p) => p.row * BOARD_SIZE + p.col));
   let msg = `You played ${allWords} for ${res.score}${res.bingo ? ' — BINGO!' : ''}`;
   if (usedMult) msg += ` (×${SHOP_BY_ID[usedMult].name.includes('Triple') ? 3 : 2})`;
   if (usedExtra) msg += ' — extra turn!';
@@ -1105,6 +1118,7 @@ function bindControls() {
     toast('Statistics deleted.');
   });
   $('btn-app-version').addEventListener('click', openNotes);
+  $('btn-history-toggle').addEventListener('click', toggleHistoryCollapsed);
   $('btn-best').addEventListener('click', showBestWord);
   $('btn-powerups').addEventListener('click', openPowerups);
   $('btn-powerups-close').addEventListener('click', () => $('powerups-dialog').classList.add('hidden'));
@@ -1344,41 +1358,57 @@ function doFreeSwap(tiles) {
 }
 
 // ---------- New game / home screen ----------
+// Remembered across opens, so the dialog's UI and the value used to start the
+// game never drift apart (the cause of "randomized was ignored" on replay).
+const newConfig = { opponent: 'ai', difficulty: 'intermediate', mode: 'standard' };
+let newDialogBound = false;
+
 export function openNewDialog() {
   const dlg = $('new-dialog');
-  const state = { opponent: 'ai', difficulty: 'intermediate', mode: 'standard' };
 
-  // Difficulty as a simple dropdown.
+  // Difficulty dropdown reflects the remembered choice.
   const sel = $('opt-difficulty');
   sel.innerHTML = '';
   DIFFICULTIES.forEach((d) => {
     const o = document.createElement('option');
     o.value = d.id;
     o.textContent = d.name;
-    if (d.id === state.difficulty) o.selected = true;
     sel.appendChild(o);
   });
+  sel.value = newConfig.difficulty;
   const showBlurb = () => {
-    const d = DIFFICULTIES.find((x) => x.id === state.difficulty);
+    const d = DIFFICULTIES.find((x) => x.id === newConfig.difficulty);
     $('difficulty-blurb').textContent = d ? d.blurb : '';
   };
-  sel.onchange = () => { state.difficulty = sel.value; showBlurb(); };
   showBlurb();
 
-  bindSeg('opt-opponent', (val) => {
-    state.opponent = val;
-    $('difficulty-field').style.display = val === 'ai' ? '' : 'none';
-  });
-  bindSeg('opt-mode', (val) => { state.mode = val; });
+  // Sync the segmented controls to the remembered config so the highlighted
+  // option always matches what will actually be used.
+  setSegActive('opt-opponent', newConfig.opponent);
+  setSegActive('opt-mode', newConfig.mode);
+  $('difficulty-field').style.display = newConfig.opponent === 'ai' ? '' : 'none';
 
   renderHomeStats();
-  // Cancel only makes sense if there's a game to return to.
   $('btn-cancel').classList.toggle('hidden', !game);
 
-  $('btn-start').onclick = () => { dlg.classList.add('hidden'); startNewGame(state); };
-  $('btn-cancel').onclick = () => { if (game) dlg.classList.add('hidden'); };
+  // Bind listeners exactly once (re-binding each open leaked duplicates).
+  if (!newDialogBound) {
+    newDialogBound = true;
+    sel.onchange = () => { newConfig.difficulty = sel.value; showBlurb(); };
+    bindSeg('opt-opponent', (val) => {
+      newConfig.opponent = val;
+      $('difficulty-field').style.display = val === 'ai' ? '' : 'none';
+    });
+    bindSeg('opt-mode', (val) => { newConfig.mode = val; });
+    $('btn-start').onclick = () => { dlg.classList.add('hidden'); startNewGame({ ...newConfig }); };
+    $('btn-cancel').onclick = () => { if (game) dlg.classList.add('hidden'); };
+  }
 
   dlg.classList.remove('hidden');
+}
+
+function setSegActive(id, val) {
+  $(id).querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.val === val));
 }
 
 // Compact stats summary on the home screen.
