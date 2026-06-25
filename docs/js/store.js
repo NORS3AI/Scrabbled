@@ -46,6 +46,22 @@ function write(key, value) {
   try { localStorage.setItem(key, serialized); } catch { /* persistence best-effort */ }
 }
 
+// Re-write the whole in-memory cache to localStorage. A belt-and-suspenders
+// flush for browsers that defer/flake writes — runs when the tab is hidden or
+// unloaded so progress isn't lost if an earlier write didn't stick.
+function flushStorage() {
+  for (const [k, v] of memCache) {
+    try { localStorage.setItem(k, v); } catch { /* ignore */ }
+  }
+}
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  window.addEventListener('pagehide', flushStorage);
+  window.addEventListener('beforeunload', flushStorage);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushStorage();
+  });
+}
+
 export function getWallet() { return read(WALLET_KEY, DEFAULT_WALLET); }
 export function getStats() { return read(STATS_KEY, DEFAULT_STATS); }
 

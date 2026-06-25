@@ -113,7 +113,10 @@ try {
   await page.click('[data-buy="hint"]');
   const owned = await page.$eval('[data-buy="hint"]', (b) => b.closest('.shop-card').querySelector('.shop-own').textContent);
   if (!/Owned: 1/.test(owned)) fail(`hint not purchased, saw "${owned}"`); else console.log('OK: bought a power-up in the shop');
-  await page.click('#btn-shop-close');
+  // Tapping the dimmed backdrop (top-left corner) closes the dialog.
+  await page.mouse.click(8, 8);
+  const shopClosed = await page.$eval('#shop-dialog', (d) => d.classList.contains('hidden'));
+  if (!shopClosed) { await page.click('#btn-shop-close'); fail('tapping outside did not close the shop'); } else console.log('OK: tapping outside closes the dialog');
 
   // Use the Hint power-up; it should highlight the best word on the board.
   await page.click('#btn-powerups');
