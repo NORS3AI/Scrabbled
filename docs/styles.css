@@ -101,20 +101,24 @@ body { display: flex; flex-direction: column; }
   gap: 2px; background: var(--board-line); padding: 4px; border-radius: 8px; box-shadow: var(--shadow);
 }
 
-/* Floating, collapsible move-history panel — hovers over the board's top-right
-   with a drop shadow; collapsing shrinks it to just its header (never hides). */
+/* Floating, draggable, collapsible move-history panel — hovers with a drop
+   shadow; drag its header to move it anywhere; collapsing shrinks it to just its
+   header (never hides). Position is fixed to the viewport so it can leave the
+   board entirely. */
 .history-panel {
-  position: absolute; top: 6px; right: 6px; z-index: 4;
-  width: 142px; max-height: 48%;
+  position: fixed; top: 58px; right: 10px; z-index: 12;
+  width: 142px; max-height: 42vh;
   display: flex; flex-direction: column; overflow: hidden;
-  background: rgba(255, 255, 255, .93); color: #21303b;
+  background: rgba(255, 255, 255, .95); color: #21303b;
   border-radius: 10px; box-shadow: 0 6px 18px rgba(0, 0, 0, .5);
 }
 .history-toggle {
   display: flex; align-items: center; justify-content: space-between; gap: .4rem;
-  background: #21303b; color: #fff; border: none; cursor: pointer;
-  padding: .28rem .5rem; font-weight: 700; font-size: .74rem; flex: 0 0 auto;
+  background: #21303b; color: #fff; border: none; cursor: move; touch-action: none;
+  padding: .3rem .5rem; font-weight: 700; font-size: .74rem; flex: 0 0 auto;
+  user-select: none;
 }
+.history-toggle::before { content: "⠿"; opacity: .6; margin-right: .15rem; }
 .history-toggle .chev { transition: transform .15s ease; }
 .history-panel.collapsed { width: auto; }
 .history-panel.collapsed .history-list { display: none; }
