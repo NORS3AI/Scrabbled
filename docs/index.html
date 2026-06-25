@@ -23,78 +23,64 @@
   </div>
 
   <header class="topbar">
-    <div class="brand"><span class="logo-mark small">S</span> Scrabbled</div>
+    <div class="brand"><span class="logo-mark small">S</span></div>
     <div class="wallet">
-      <button id="btn-notes" class="ver-badge" title="Patch notes">v0.0.6-alpha</button>
       <span class="coin" title="Coins">🪙 <b id="wallet-coins">0</b></span>
       <span class="gem" title="Gems">💎 <b id="wallet-gems">0</b><span id="gem-gain" class="gem-gain"></span></span>
       <button id="btn-achievements" class="btn btn-icon ach-btn" title="Achievements" aria-label="Achievements">🏆<span id="ach-badge" class="badge hidden">0</span></button>
       <button id="btn-shop" class="btn btn-icon" title="Shop" aria-label="Shop">🛒</button>
-      <button id="btn-stats" class="btn btn-icon" title="Stats" aria-label="Stats">📊</button>
-      <button id="btn-history" class="btn btn-icon hist-toggle" title="Toggle history" aria-label="Toggle history">📜</button>
       <button id="btn-settings" class="btn btn-icon" title="Settings" aria-label="Settings">⚙</button>
-      <button id="btn-new" class="btn btn-light">New Game</button>
     </div>
   </header>
 
   <main id="app" class="app hidden">
-    <div class="stage">
-      <div class="scoreboard" id="scoreboard"></div>
-
-      <section class="board-area">
-        <div id="board" class="board" aria-label="Game board"></div>
-        <div class="bag-info"><span id="bag-count">100</span> tiles in bag</div>
-      </section>
-
-      <aside class="history-wrap">
-        <div class="history-head">
-          <h2>History</h2>
-          <button id="btn-history-collapse" class="btn btn-small" title="Hide history">Hide ›</button>
-        </div>
-        <ol id="history" class="history"></ol>
-      </aside>
+    <div class="board-wrap">
+      <div id="board" class="board" aria-label="Game board"></div>
     </div>
 
     <section class="dock">
-      <div class="dock-inner">
-        <div id="dev-panel" class="dev-panel hidden">
-          <div class="dev-row">
-            <span class="dev-tag">DEV</span>
-            <button id="btn-best" class="btn btn-small">Best word</button>
-            <button id="btn-place-best" class="btn btn-small">Place on board</button>
-            <span id="best-result" class="best-result">—</span>
-          </div>
+      <div id="dev-panel" class="dev-panel hidden">
+        <div class="dev-row">
+          <span class="dev-tag">DEV</span>
+          <button id="btn-best" class="btn btn-small">Best word</button>
+          <button id="btn-place-best" class="btn btn-small">Place on board</button>
+          <span id="best-result" class="best-result">—</span>
         </div>
-        <div id="armed-banner" class="armed-banner hidden"></div>
-        <div id="message" class="message" role="status"></div>
-        <div id="rack" class="rack" aria-label="Your tiles"></div>
+      </div>
+      <div id="armed-banner" class="armed-banner hidden"></div>
+      <div id="message" class="message" role="status"></div>
+      <div id="rack" class="rack" aria-label="Your tiles"></div>
+      <div class="actionbar">
+        <div class="status">
+          <div class="bag"><b id="bag-count">100</b><span>in bag</span></div>
+          <div class="scoreboard" id="scoreboard"></div>
+        </div>
         <div class="controls">
-          <button id="btn-play" class="btn btn-primary">Play</button>
-          <button id="btn-recall" class="btn">Recall</button>
-          <button id="btn-shuffle" class="btn">Shuffle</button>
-          <button id="btn-swap" class="btn">Swap</button>
-          <button id="btn-pass" class="btn">Pass</button>
-          <button id="btn-powerups" class="btn">⚡ Power-ups</button>
+          <button id="btn-shuffle" class="btn" title="Shuffle rack">Shuffle</button>
+          <button id="btn-swap" class="btn" title="Swap tiles / Recall">Swap</button>
+          <button id="btn-play" class="btn btn-primary" title="Play">Play</button>
+          <button id="btn-powerups" class="btn" title="Use a power-up">Power-ups</button>
+          <button id="btn-new" class="btn" title="New game">New Game</button>
         </div>
       </div>
     </section>
   </main>
 
-  <!-- New game dialog -->
+  <!-- New game / home screen -->
   <div id="new-dialog" class="overlay hidden">
-    <div class="overlay-card wide">
-      <h2>New Game</h2>
+    <div class="overlay-card home-card">
+      <div class="home-logo"><span class="logo-mark">S</span><h1>Scrabbled</h1></div>
       <div class="field">
         <label>Opponent</label>
         <div class="seg" id="opt-opponent">
           <button data-val="ai" class="seg-btn active">Computer</button>
-          <button data-val="practice" class="seg-btn">Practice (solo)</button>
-          <button data-val="hotseat" class="seg-btn">Pass &amp; Play</button>
+          <button data-val="practice" class="seg-btn">Practice</button>
+          <button data-val="hotseat" class="seg-btn">2 Players</button>
         </div>
       </div>
       <div class="field" id="difficulty-field">
         <label>Difficulty</label>
-        <div class="seg wrap" id="opt-difficulty"></div>
+        <select id="opt-difficulty" class="select"></select>
         <p class="muted small" id="difficulty-blurb"></p>
       </div>
       <div class="field">
@@ -104,9 +90,11 @@
           <button data-val="randomized" class="seg-btn">Randomized</button>
         </div>
       </div>
-      <div class="dialog-actions">
-        <button id="btn-start" class="btn btn-primary">Start</button>
-        <button id="btn-cancel" class="btn">Cancel</button>
+      <button id="btn-start" class="btn btn-primary btn-block">New Game</button>
+      <button id="btn-cancel" class="btn btn-block hidden">Cancel</button>
+      <div class="home-stats">
+        <h2>My stats</h2>
+        <div id="home-stats-body" class="home-stats-body"></div>
       </div>
     </div>
   </div>
@@ -127,6 +115,7 @@
       <div id="swap-rack" class="rack center"></div>
       <div class="dialog-actions">
         <button id="btn-swap-confirm" class="btn btn-primary">Swap</button>
+        <button id="btn-swap-pass" class="btn">Pass turn</button>
         <button id="btn-swap-cancel" class="btn">Cancel</button>
       </div>
     </div>
@@ -201,12 +190,25 @@
   <!-- Settings -->
   <div id="settings-dialog" class="overlay hidden">
     <div class="overlay-card wide">
-      <h2>Settings</h2>
-      <div class="field">
-        <label>Background theme</label>
-        <div id="theme-picker" class="theme-picker"></div>
-        <p class="muted small">Buy more backgrounds with coins in the Shop (🛒).</p>
+      <div class="dialog-head">
+        <h2>Settings</h2>
+        <button id="btn-settings-close" class="btn btn-primary btn-small">Done</button>
       </div>
+
+      <h3 class="settings-head">Appearance</h3>
+      <div class="field">
+        <label>Theme (background &amp; tiles)</label>
+        <div id="theme-picker" class="theme-picker"></div>
+        <p class="muted small">Buy more themes with coins in the Shop (🛒).</p>
+      </div>
+
+      <h3 class="settings-head">Gameplay</h3>
+      <label class="check-row">
+        <input type="checkbox" id="set-low-tiles" />
+        <span><b>Show when the opponent has less than 7 tiles left.</b></span>
+      </label>
+
+      <h3 class="settings-head">Developer</h3>
       <label class="check-row">
         <input type="checkbox" id="set-dev" />
         <span>
@@ -230,8 +232,22 @@
           <button class="btn btn-small" data-coin="1000">+1000</button>
         </div>
       </div>
+
+      <h3 class="settings-head">Data</h3>
+      <button id="btn-delete-stats" class="btn btn-danger">Delete statistics</button>
+
+      <button id="btn-app-version" class="app-version">Scrabbled v0.0.7-alpha · patch notes</button>
+    </div>
+  </div>
+
+  <!-- Confirm delete stats -->
+  <div id="confirm-dialog" class="overlay hidden">
+    <div class="overlay-card">
+      <h2>Are you sure? :(</h2>
+      <p class="muted">This permanently deletes all your statistics.</p>
       <div class="dialog-actions">
-        <button id="btn-settings-close" class="btn btn-primary">Done</button>
+        <button id="btn-confirm-yes" class="btn btn-danger">Delete</button>
+        <button id="btn-confirm-no" class="btn btn-primary">Keep my stats</button>
       </div>
     </div>
   </div>

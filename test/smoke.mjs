@@ -85,9 +85,10 @@ try {
   const pending = await page.$$eval('#board .tile.pending', (els) => els.length);
   if (pending !== 1) fail(`expected 1 pending tile after place, got ${pending}`); else console.log('OK: tile places on board');
 
-  await page.click('#btn-recall');
+  // The Swap button becomes Recall once a tile is on the board.
+  await page.click('#btn-swap');
   const afterRecall = await page.$$eval('#board .tile.pending', (els) => els.length);
-  if (afterRecall !== 0) fail('recall did not clear pending tiles'); else console.log('OK: recall works');
+  if (afterRecall !== 0) fail('recall did not clear pending tiles'); else console.log('OK: Swap→Recall works');
 
   // Achievement badge reflects the two seeded claimable achievements.
   const badge = await page.$eval('#ach-badge', (b) => (b.classList.contains('hidden') ? '' : b.textContent));
@@ -138,24 +139,18 @@ try {
   await page.click('#btn-place-best');
   await page.waitForFunction(() => document.querySelectorAll('#board .tile.pending').length >= 2, { timeout: 8000 });
   console.log('OK: dev "Place on board" placed the best word');
-  await page.click('#btn-recall');
+  await page.click('#btn-swap'); // recall the placed tiles
 
-  // Stats panel renders cells.
-  await page.click('#btn-stats');
-  await page.waitForSelector('#stats-dialog:not(.hidden)');
-  const statCells = await page.$$eval('#stats-body .stat-cell', (els) => els.length);
-  if (statCells < 5) fail(`stats panel sparse (${statCells} cells)`); else console.log('OK: stats panel renders');
-  await page.click('#btn-stats-close');
-
-  // History toggle changes the column's visibility — and must NOT hide the dev panel.
-  const histVisible = () => page.$eval('.history-wrap', (el) => getComputedStyle(el).display !== 'none');
-  const histBefore = await histVisible();
-  await page.click('#btn-history');
-  const histAfter = await histVisible();
-  if (histBefore === histAfter) fail('history toggle did not change visibility'); else console.log('OK: history toggle works');
-  const devStillShown = await page.$eval('#dev-panel', (el) => !el.classList.contains('hidden'));
-  if (!devStillShown) fail('dev panel hidden when toggling history'); else console.log('OK: dev panel stays visible when history toggled');
-  await page.click('#btn-history'); // restore
+  // Buy a theme with coins and confirm it recolors the tiles (CSS var changes).
+  await page.click('#btn-shop');
+  await page.waitForSelector('#shop-dialog:not(.hidden)');
+  await page.click('[data-buytheme="purple"]');
+  await page.click('#btn-shop-close');
+  await page.click('#btn-settings');
+  await page.$$eval('#theme-picker .theme-btn', (btns) => { const t = btns.find((b) => /Velvet/.test(b.textContent)); if (t) t.click(); });
+  const tileVar = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--tile-edge').trim());
+  if (!tileVar || tileVar === '#c8a35f') fail(`theme did not recolor tiles (--tile-edge=${tileVar})`); else console.log('OK: theme recolors tiles');
+  await page.click('#btn-settings-close');
 
   // Drag a rack tile across the board and confirm no ghost artifact remains.
   const tBox = await page.$eval('#rack .slot[data-rack-index="0"] .tile', (el) => { const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
@@ -167,10 +162,12 @@ try {
   await page.mouse.up();
   const ghosts = await page.$$eval('.tile.ghost', (els) => els.length);
   if (ghosts !== 0) fail(`drag left ${ghosts} ghost artifact(s)`); else console.log('OK: drag leaves no ghost artifact');
-  await page.click('#btn-recall');
+  await page.click('#btn-swap'); // recall
 
-  // Pass the turn so the computer plays; its tiles should be gold-highlighted.
-  await page.click('#btn-pass');
+  // Pass via the Swap dialog so the computer plays; its tiles should be gold.
+  await page.click('#btn-swap');
+  await page.waitForSelector('#swap-dialog:not(.hidden)');
+  await page.click('#btn-swap-pass');
   await page.waitForFunction(() => document.querySelectorAll('#board .tile.lastmove').length >= 2, { timeout: 15000 });
   console.log('OK: computer move highlighted gold (lastmove)');
 

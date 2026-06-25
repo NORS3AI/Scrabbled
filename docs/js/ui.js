@@ -9,7 +9,7 @@ import { scoreMove } from './scoring.js';
 import { chooseMove, bestMove } from './ai.js';
 import { DIFFICULTIES } from './ai.js';
 import {
-  getWallet, addCurrency, recordGame, recordPlay, incStat, getStats, rewardForGame,
+  getWallet, addCurrency, recordGame, recordPlay, incStat, getStats, resetStats, rewardForGame,
   getSeenVersion, setSeenVersion, getSettings, setSettings,
   getAchievements, unlockAchievements, claimAchievement,
   getInventory, buyItem, useItem,
@@ -50,15 +50,22 @@ export function startUI() {
   applyTheme();
   settings = getSettings();
   applySettings();
+  $('btn-app-version').textContent = `Scrabbled ${VERSION} · patch notes`;
   // Show "What's new" once per release.
   if (getSeenVersion() !== VERSION) openNotes();
 }
 
-// ---------- Background themes ----------
+// ---------- Themes (background + tiles) ----------
 function applyTheme() {
   const t = getThemes();
   const theme = THEME_BY_ID[t.selected] || THEMES[0];
   document.body.style.background = theme.bg;
+  const root = document.documentElement.style;
+  if (theme.tile) {
+    root.setProperty('--tile-bg', theme.tile.bg);
+    root.setProperty('--tile-edge', theme.tile.edge);
+    root.setProperty('--tile-text', theme.tile.text);
+  }
 }
 
 function renderThemePicker() {
@@ -81,8 +88,6 @@ function renderThemePicker() {
 }
 
 // ---------- Settings & dev panel ----------
-// Dev panel and history are independent toggles; each has its own apply fn so
-// changing one never affects the other.
 function applyDevPanel() {
   $('dev-panel').classList.toggle('hidden', !settings.devPanel);
   $('dev-tools').classList.toggle('hidden', !settings.devPanel);
@@ -90,18 +95,9 @@ function applyDevPanel() {
   if (!settings.devPanel) clearHint();
 }
 
-function applyHistory() {
-  document.getElementById('app').classList.toggle('history-open', !!settings.historyOpen);
-}
-
 function applySettings() {
   applyDevPanel();
-  applyHistory();
-}
-
-function toggleHistory() {
-  settings = setSettings({ historyOpen: !settings.historyOpen });
-  applyHistory(); // only touches history — leaves the dev panel alone
+  $('set-low-tiles').checked = !!settings.showOpponentLowTiles;
 }
 
 function openSettings() { applySettings(); renderThemePicker(); $('settings-dialog').classList.remove('hidden'); }
@@ -270,7 +266,6 @@ function render() {
   renderScoreboard();
   renderBoard();
   renderRack();
-  renderHistory();
   $('bag-count').textContent = game.bag.length;
   updateControls();
 }
@@ -278,11 +273,17 @@ function render() {
 function renderScoreboard() {
   const sb = $('scoreboard');
   sb.innerHTML = '';
+  const showLow = !!settings.showOpponentLowTiles;
   game.players.forEach((p) => {
     const card = document.createElement('div');
     card.className = 'player-card' + (p.id === game.current && game.status === 'active' ? ' active' : '');
-    const tag = p.type === 'ai' ? `<span class="tag">${aiName(p.difficulty)}</span>` : '';
-    card.innerHTML = `<span class="name">${escapeHtml(p.name)}${tag}</span><span class="pts">${p.score}</span>`;
+    // Show the opponent's remaining tiles when low, if enabled. "Opponent" = any
+    // player who isn't the one whose turn it is to view (the local human side).
+    let low = '';
+    if (showLow && p.type === 'ai' && p.rack && p.rack.length < 7) {
+      low = `<span class="lowtiles">${p.rack.length} left</span>`;
+    }
+    card.innerHTML = `<span class="name">${escapeHtml(p.name)}</span>${low}<span class="pts">${p.score}</span>`;
     sb.appendChild(card);
   });
 }
@@ -394,13 +395,22 @@ function renderHistory() {
 // ---------- Controls ----------
 function updateControls() {
   const human = isHumanTurn();
-  const active = game.status === 'active';
-  $('btn-play').disabled = !human || pending.length === 0 || busy;
-  $('btn-recall').disabled = !human || pending.length === 0 || busy;
+  const hasPending = pending.length > 0;
+  $('btn-play').disabled = !human || !hasPending || busy;
   $('btn-shuffle').disabled = !human || busy;
-  $('btn-swap').disabled = !human || busy || game.bag.length < RACK_SIZE;
-  $('btn-pass').disabled = !human || busy || !active;
   $('btn-powerups').disabled = !human || busy;
+  // Swap button doubles as Recall once tiles are on the board.
+  const swap = $('btn-swap');
+  if (hasPending) {
+    swap.textContent = 'Recall';
+    swap.disabled = !human || busy;
+  } else {
+    swap.textContent = 'Swap';
+    // Swapping needs a full bag; otherwise the swap dialog still offers Pass.
+    swap.disabled = !human || busy;
+  }
+  // New Game is always available.
+  $('btn-new').disabled = false;
 }
 
 function isHumanTurn() {
@@ -1035,11 +1045,14 @@ function pickBlankLetter() {
 // ---------- Pointer interaction (tap + drag) ----------
 function bindControls() {
   $('btn-play').addEventListener('click', commitPlay);
-  $('btn-recall').addEventListener('click', recallAll);
   $('btn-shuffle').addEventListener('click', shuffleRack);
-  $('btn-pass').addEventListener('click', doPass);
+  // The Swap button becomes Recall once tiles are on the board.
+  $('btn-swap').addEventListener('click', () => {
+    if (pending.length > 0) recallAll();
+    else openSwapDialog(false);
+  });
+  $('btn-new').addEventListener('click', openNewDialog);
   $('btn-again').addEventListener('click', () => { $('end-dialog').classList.add('hidden'); openNewDialog(); });
-  $('btn-notes').addEventListener('click', openNotes);
   $('btn-notes-close').addEventListener('click', closeNotes);
   $('btn-settings').addEventListener('click', openSettings);
   $('btn-settings-close').addEventListener('click', closeSettings);
@@ -1047,8 +1060,19 @@ function bindControls() {
     settings = setSettings({ devPanel: e.target.checked });
     applySettings();
   });
+  $('set-low-tiles').addEventListener('change', (e) => {
+    settings = setSettings({ showOpponentLowTiles: e.target.checked });
+    if (game) render();
+  });
+  $('btn-delete-stats').addEventListener('click', () => $('confirm-dialog').classList.remove('hidden'));
+  $('btn-confirm-no').addEventListener('click', () => $('confirm-dialog').classList.add('hidden'));
+  $('btn-confirm-yes').addEventListener('click', () => {
+    resetStats();
+    $('confirm-dialog').classList.add('hidden');
+    toast('Statistics deleted.');
+  });
+  $('btn-app-version').addEventListener('click', openNotes);
   $('btn-best').addEventListener('click', showBestWord);
-  $('btn-swap').addEventListener('click', () => openSwapDialog(false));
   $('btn-powerups').addEventListener('click', openPowerups);
   $('btn-powerups-close').addEventListener('click', () => $('powerups-dialog').classList.add('hidden'));
   $('btn-achievements').addEventListener('click', openAchievements);
@@ -1056,10 +1080,7 @@ function bindControls() {
   $('btn-claim-all').addEventListener('click', claimAll);
   $('btn-shop').addEventListener('click', openShop);
   $('btn-shop-close').addEventListener('click', () => $('shop-dialog').classList.add('hidden'));
-  $('btn-stats').addEventListener('click', openStats);
   $('btn-stats-close').addEventListener('click', () => $('stats-dialog').classList.add('hidden'));
-  $('btn-history').addEventListener('click', toggleHistory);
-  $('btn-history-collapse').addEventListener('click', toggleHistory);
   $('btn-place-best').addEventListener('click', placeBestWord);
   // Dev currency buttons (+gems / +coins) live in Settings now.
   $('dev-tools').addEventListener('click', (e) => {
@@ -1262,13 +1283,19 @@ function openSwapDialog(free = false) {
     });
     rackEl.appendChild(slot);
   });
+  // Swapping needs a full bag; if not, only Pass is available.
+  const canSwap = game.bag.length >= RACK_SIZE;
+  $('btn-swap-confirm').disabled = !canSwap;
+  $('btn-swap-confirm').title = canSwap ? '' : 'Not enough tiles left in the bag to swap.';
+  $('btn-swap-pass').style.display = free ? 'none' : '';
   $('btn-swap-confirm').onclick = () => {
-    if (picks.size === 0) return;
+    if (picks.size === 0 || !canSwap) return;
     const tiles = [...picks].map((i) => player.rack[i]);
     dlg.classList.add('hidden');
     if (free) doFreeSwap(tiles);
     else doSwap(tiles);
   };
+  $('btn-swap-pass').onclick = () => { dlg.classList.add('hidden'); doPass(); };
   $('btn-swap-cancel').onclick = () => dlg.classList.add('hidden');
   dlg.classList.remove('hidden');
 }
@@ -1283,26 +1310,27 @@ function doFreeSwap(tiles) {
   saveState();
 }
 
-// ---------- New game dialog ----------
+// ---------- New game / home screen ----------
 export function openNewDialog() {
   const dlg = $('new-dialog');
   const state = { opponent: 'ai', difficulty: 'intermediate', mode: 'standard' };
 
-  const diffWrap = $('opt-difficulty');
-  diffWrap.innerHTML = '';
+  // Difficulty as a simple dropdown.
+  const sel = $('opt-difficulty');
+  sel.innerHTML = '';
   DIFFICULTIES.forEach((d) => {
-    const b = document.createElement('button');
-    b.className = 'seg-btn' + (d.id === state.difficulty ? ' active' : '');
-    b.textContent = d.name;
-    b.dataset.val = d.id;
-    b.addEventListener('click', () => {
-      state.difficulty = d.id;
-      [...diffWrap.children].forEach((c) => c.classList.toggle('active', c === b));
-      $('difficulty-blurb').textContent = d.blurb;
-    });
-    diffWrap.appendChild(b);
+    const o = document.createElement('option');
+    o.value = d.id;
+    o.textContent = d.name;
+    if (d.id === state.difficulty) o.selected = true;
+    sel.appendChild(o);
   });
-  $('difficulty-blurb').textContent = DIFFICULTIES.find((d) => d.id === state.difficulty).blurb;
+  const showBlurb = () => {
+    const d = DIFFICULTIES.find((x) => x.id === state.difficulty);
+    $('difficulty-blurb').textContent = d ? d.blurb : '';
+  };
+  sel.onchange = () => { state.difficulty = sel.value; showBlurb(); };
+  showBlurb();
 
   bindSeg('opt-opponent', (val) => {
     state.opponent = val;
@@ -1310,10 +1338,26 @@ export function openNewDialog() {
   });
   bindSeg('opt-mode', (val) => { state.mode = val; });
 
+  renderHomeStats();
+  // Cancel only makes sense if there's a game to return to.
+  $('btn-cancel').classList.toggle('hidden', !game);
+
   $('btn-start').onclick = () => { dlg.classList.add('hidden'); startNewGame(state); };
   $('btn-cancel').onclick = () => { if (game) dlg.classList.add('hidden'); };
 
   dlg.classList.remove('hidden');
+}
+
+// Compact stats summary on the home screen.
+function renderHomeStats() {
+  const s = getStats();
+  const row = (k, v) => `<div class="home-stat-row"><span class="k">${escapeHtml(k)}</span><span class="v">${escapeHtml(String(v))}</span></div>`;
+  $('home-stats-body').innerHTML =
+    row('Victories / games', `${s.wins} / ${s.games}`) +
+    row('Avg move score', s.moves ? Math.round(s.totalGameScore / s.moves) : '—') +
+    row('Bingos', s.bingos) +
+    row('Best final score', s.highestGameScore || '—') +
+    row('Best word', s.highestWord ? `${s.highestWord} (${s.highestWordScore})` : '—');
 }
 
 function bindSeg(id, onPick) {

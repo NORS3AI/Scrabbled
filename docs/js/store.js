@@ -7,7 +7,7 @@ const WALLET_KEY = 'scrabbled.wallet.v1';
 const STATS_KEY = 'scrabbled.stats.v1';
 const SEEN_VERSION_KEY = 'scrabbled.seenVersion';
 const SETTINGS_KEY = 'scrabbled.settings.v1';
-const DEFAULT_SETTINGS = { devPanel: false, historyOpen: true };
+const DEFAULT_SETTINGS = { devPanel: false, historyOpen: true, showOpponentLowTiles: false };
 const ACH_KEY = 'scrabbled.achievements.v1';
 const INV_KEY = 'scrabbled.inventory.v1';
 const THEMES_KEY = 'scrabbled.themes.v1';
@@ -48,6 +48,12 @@ function write(key, value) {
 
 export function getWallet() { return read(WALLET_KEY, DEFAULT_WALLET); }
 export function getStats() { return read(STATS_KEY, DEFAULT_STATS); }
+
+// Wipe all gameplay statistics back to zero (Settings → Data → Delete).
+export function resetStats() {
+  write(STATS_KEY, { ...DEFAULT_STATS, letterCounts: {} });
+  return getStats();
+}
 
 // Track the last app version whose patch notes the player has seen, so the
 // "What's new" dialog only auto-opens once per release.

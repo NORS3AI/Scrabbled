@@ -2,9 +2,21 @@
 // top entry's version makes the "What's new" dialog pop once for returning
 // players. Keep entries short and player-facing.
 
-export const VERSION = 'v0.0.6-alpha';
+export const VERSION = 'v0.0.7-alpha';
 
 export const PATCH_NOTES = [
+  {
+    version: 'v0.0.7-alpha',
+    date: '2026-06-25',
+    title: 'New layout & themed tiles',
+    changes: [
+      'Brand-new layout: a much bigger board, a slim top bar, and a bottom action bar showing the bag count, both scores, and your controls.',
+      'Tiles are themed now — the classic look is gold, and themes bought with coins recolor both the tiles and the background.',
+      'Bottom buttons: Shuffle, Swap (becomes Recall once you place tiles), Play, Power-ups, and New Game (Pass lives in the Swap dialog).',
+      'Settings reorganized: Appearance (theme), Gameplay ("Show when the opponent has less than 7 tiles left"), Developer, and Data (Delete statistics). The app version at the bottom opens these patch notes.',
+      'The home screen is simplified with a difficulty dropdown and a quick stats summary.',
+    ],
+  },
   {
     version: 'v0.0.6-alpha',
     date: '2026-06-25',
