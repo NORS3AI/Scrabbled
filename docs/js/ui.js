@@ -9,8 +9,8 @@ import { scoreMove } from './scoring.js';
 import { chooseMove, bestMove } from './ai.js';
 import { DIFFICULTIES } from './ai.js';
 import {
-  getWallet, addCurrency, recordGame, rewardForGame, getSeenVersion, setSeenVersion,
-  getSettings, setSettings,
+  getWallet, addCurrency, recordGame, recordPlay, incStat, getStats, rewardForGame,
+  getSeenVersion, setSeenVersion, getSettings, setSettings,
   getAchievements, unlockAchievements, claimAchievement,
   getInventory, buyItem, useItem,
 } from './store.js';
@@ -31,7 +31,7 @@ let selectedRackIndex = null;
 let drag = null;            // active drag state
 let busy = false;           // AI thinking / animating -> lock input
 let hint = null;            // dev-panel best-word highlight {cells, word, score}
-let settings = { devPanel: false };
+let settings = { devPanel: false, historyOpen: true };
 let achTracker = newTracker();      // per-game achievement accumulator
 let armed = { multiplier: 0, multItem: null, extraTurn: false }; // armed power-ups
 
@@ -54,6 +54,12 @@ function applySettings() {
   $('dev-panel').classList.toggle('hidden', !settings.devPanel);
   $('set-dev').checked = !!settings.devPanel;
   if (!settings.devPanel) clearHint();
+  document.getElementById('app').classList.toggle('history-open', !!settings.historyOpen);
+}
+
+function toggleHistory() {
+  settings = setSettings({ historyOpen: !settings.historyOpen });
+  applySettings();
 }
 
 function openSettings() { applySettings(); $('settings-dialog').classList.remove('hidden'); }
@@ -94,6 +100,40 @@ function showBestWord() {
     const r = computeBestWordHint();
     $('best-result').textContent = r ? r.label : 'No move available — try swapping.';
   }, 20);
+}
+
+// Dev-panel button: auto-place the best word's tiles onto the board as pending
+// tiles (the player can then press Play). Maps each tile to a rack slot.
+function placeBestWord() {
+  if (!isHumanTurn()) return;
+  if (!hint || !hint.cells) {
+    $('best-result').textContent = 'Searching…';
+    setTimeout(() => { if (computeBestWordHint()) placeBestWord(); }, 20);
+    return;
+  }
+  const cells = hint.cells.slice();
+  recallAll(); // clears any current pending (and the hint)
+  const rack = currentPlayer(game).rack;
+  const usedIdx = [];
+  const np = [];
+  for (const c of cells) {
+    const want = c.blank ? '?' : c.letter;
+    let idx = rack.findIndex((t, i) => t === want && !usedIdx.includes(i));
+    let blank = c.blank;
+    if (idx === -1 && !c.blank) {
+      // Fall back to a blank tile representing this letter.
+      idx = rack.findIndex((t, i) => t === '?' && !usedIdx.includes(i));
+      blank = true;
+    }
+    if (idx === -1) continue;
+    usedIdx.push(idx);
+    np.push({ row: c.row, col: c.col, letter: c.letter, blank, rackIndex: idx });
+  }
+  pending = np;
+  selectedRackIndex = null;
+  render();
+  livePreview();
+  $('best-result').textContent = 'Placed — press Play to confirm.';
 }
 
 // ---------- Patch notes ----------
@@ -334,13 +374,17 @@ function recallAll() {
   render();
 }
 
-// Show the would-be score as the player builds a word.
+// Show the would-be score as the player builds a word, listing every word
+// formed (the main word and any cross words) with its own points so the bonus
+// from connecting to other words is visible.
 function livePreview() {
   if (pending.length === 0) { message(''); return; }
   const v = validateMove(game.board, pending.map((p) => ({ ...p })));
   if (v.valid) {
     const s = scoreMove(game.board, pending, v.words);
-    message(`${v.words.map((w) => w.word.toUpperCase()).join(' · ')}  =  ${s.score}${s.bingo ? ' (+50 bingo!)' : ''}`, 'ok');
+    const parts = s.breakdown.map((b) => `${b.word.toUpperCase()} ${b.score}`).join(' + ');
+    const plus = s.breakdown.length > 1 ? `${parts} = ` : '';
+    message(`${plus}${s.score}${s.bingo ? ' +50 bingo!' : ''}`, 'ok');
   } else {
     message(v.error, '');
   }
@@ -365,14 +409,23 @@ function commitPlay() {
   armed = { multiplier: 0, multItem: null, extraTurn: false };
   renderArmed();
 
-  const word = res.words.find((w) => w.isMain) || res.words[0];
+  // List every word formed (main + cross words) so the bonus is visible.
+  const allWords = res.words.map((w) => w.word.toUpperCase()).join(' + ');
   pending = [];
   selectedRackIndex = null;
   hint = null;
-  let msg = `You played ${word.word.toUpperCase()} for ${res.score}${res.bingo ? ' — BINGO!' : ''}`;
+  let msg = `You played ${allWords} for ${res.score}${res.bingo ? ' — BINGO!' : ''}`;
   if (usedMult) msg += ` (×${SHOP_BY_ID[usedMult].name.includes('Triple') ? 3 : 2})`;
   if (usedExtra) msg += ' — extra turn!';
   message(msg, 'ok');
+
+  // Per-move stats (counts every word formed, tiles, letters, bests).
+  recordPlay({
+    words: res.words.map((w) => w.word),
+    playScore: res.score,
+    bingo: res.bingo,
+    tiles: placement,
+  });
 
   // Achievements from this play.
   evalPlayAchievements(human, res);
@@ -413,6 +466,7 @@ function doPass() {
   if (!isHumanTurn()) return;
   recallAll();
   clearArmed();
+  incStat('passes');
   passTurn(game);
   render();
   if (checkEnd()) return;
@@ -424,6 +478,7 @@ function doSwap(tiles) {
   if (!res.ok) { message(res.error, 'error'); return false; }
   recallAll();
   clearArmed();
+  incStat('swaps');
   message(`Swapped ${tiles.length} tile(s).`, 'ok');
   render();
   maybeRunAI();
@@ -505,9 +560,10 @@ function showEndDialog() {
   if (game.players.length <= 2 && game.players.some((p) => p.type === 'ai') || game.players.length === 1) {
     reward = rewardForGame({ playerScore: human.score, won });
     addCurrency(reward);
-    recordGame({ won, totalScore: human.score, bestWord, bestWordScore: bestScore });
     refreshWallet();
+    if (reward.gems > 0) showGemGain(reward.gems);
   }
+  recordGame({ won, tie: !!game.tie, finalScore: human.score });
 
   // Game-end achievements (win / beat-difficulty / randomized win).
   const aiOpp = game.players.find((p) => p.type === 'ai');
@@ -537,6 +593,17 @@ function refreshWallet() {
   const w = getWallet();
   $('wallet-coins').textContent = w.coins;
   $('wallet-gems').textContent = w.gems;
+}
+
+// Floating "+N 💎" under the gem counter when gems are earned.
+function showGemGain(n) {
+  if (!n) return;
+  const el = $('gem-gain');
+  el.textContent = `+${n} 💎`;
+  el.classList.remove('show');
+  // Reflow so the animation restarts even on rapid repeats.
+  void el.offsetWidth;
+  el.classList.add('show');
 }
 
 // ---------- Toast ----------
@@ -600,6 +667,7 @@ function doClaim(id) {
   const gems = claimAchievement(id, ach.gems);
   if (gems > 0) {
     refreshWallet();
+    showGemGain(gems);
     updateAchBadge();
     toast(`Claimed 💎${gems} — ${ach.name}`);
     renderAchievements();
@@ -618,6 +686,7 @@ function claimAll() {
   }
   if (count > 0) {
     refreshWallet();
+    showGemGain(total);
     updateAchBadge();
     toast(`Claimed ${count} achievement${count > 1 ? 's' : ''} for 💎${total}`);
   }
@@ -659,6 +728,43 @@ function doBuy(id) {
   } else {
     toast(`Not enough gems for ${item.name} (need 💎${item.cost}).`);
   }
+}
+
+// ---------- Stats ----------
+function openStats() { renderStats(); $('stats-dialog').classList.remove('hidden'); }
+
+function renderStats() {
+  const s = getStats();
+  const winRate = s.games ? Math.round((s.wins / s.games) * 100) : 0;
+  const avgGame = s.games ? Math.round(s.totalGameScore / s.games) : 0;
+  const avgWord = s.moves ? Math.round(s.totalGameScore / s.moves) : 0;
+  const cell = (val, label) => `<div class="stat-cell"><div class="stat-val">${val}</div><div class="stat-label">${escapeHtml(label)}</div></div>`;
+
+  let html = '';
+  html += '<div class="stats-section"><h3>Games</h3><div class="stats-grid">' +
+    cell(s.games, 'Played') + cell(s.wins, 'Wins') + cell(s.losses, 'Losses') +
+    cell(s.ties, 'Ties') + cell(winRate + '%', 'Win rate') + '</div></div>';
+  html += '<div class="stats-section"><h3>Scoring</h3><div class="stats-grid">' +
+    cell(s.highestGameScore, 'Best game') + cell(avgGame, 'Avg / game') +
+    cell(avgWord, 'Avg / move') + cell(s.totalGameScore, 'Total points') + '</div></div>';
+  html += '<div class="stats-section"><h3>Words &amp; tiles</h3><div class="stats-grid">' +
+    cell(s.words, 'Words played') + cell(s.bingos, 'Bingos') +
+    cell(s.tilesPlayed, 'Tiles played') + cell(s.blanksPlayed, 'Blanks used') +
+    cell(s.highestWordScore, s.highestWord ? `Best word (${s.highestWord})` : 'Best word') +
+    cell(s.longestWordLen, s.longestWord ? `Longest (${s.longestWord})` : 'Longest word') +
+    cell(s.swaps, 'Swaps') + cell(s.passes, 'Passes') + '</div></div>';
+
+  const counts = s.letterCounts || {};
+  const max = Math.max(1, ...Object.values(counts).map(Number));
+  let letters = '';
+  for (const ch of 'abcdefghijklmnopqrstuvwxyz') {
+    const n = counts[ch] || 0;
+    const hot = n > 0 && n >= max * 0.66;
+    letters += `<div class="letter-cell${hot ? ' hot' : ''}"><div class="lc-letter">${ch.toUpperCase()}</div><div class="lc-count">${n}</div></div>`;
+  }
+  html += `<div class="stats-section"><h3>Letters played</h3><div class="letters-grid">${letters}</div></div>`;
+
+  $('stats-body').innerHTML = html;
 }
 
 // ---------- Power-ups (in-game use) ----------
@@ -793,13 +899,33 @@ function bindControls() {
   $('btn-claim-all').addEventListener('click', claimAll);
   $('btn-shop').addEventListener('click', openShop);
   $('btn-shop-close').addEventListener('click', () => $('shop-dialog').classList.add('hidden'));
+  $('btn-stats').addEventListener('click', openStats);
+  $('btn-stats-close').addEventListener('click', () => $('stats-dialog').classList.add('hidden'));
+  $('btn-history').addEventListener('click', toggleHistory);
+  $('btn-history-collapse').addEventListener('click', toggleHistory);
+  $('btn-place-best').addEventListener('click', placeBestWord);
 
   const board = $('board');
   const rack = $('rack');
   board.addEventListener('pointerdown', onPointerDown);
   rack.addEventListener('pointerdown', onPointerDown);
-  document.addEventListener('pointermove', onPointerMove);
+  // passive:false so we can preventDefault() during a drag to stop the page
+  // (and any stray ghost) from scrolling.
+  document.addEventListener('pointermove', onPointerMove, { passive: false });
   document.addEventListener('pointerup', onPointerUp);
+  document.addEventListener('pointercancel', onPointerCancel);
+}
+
+// Remove any drag-ghost elements (defensive: prevents stuck artifacts).
+function removeAllGhosts() {
+  document.querySelectorAll('.tile.ghost').forEach((el) => el.remove());
+}
+
+function onPointerCancel() {
+  if (!drag) return;
+  drag = null;
+  removeAllGhosts();
+  clearDropHighlight();
 }
 
 function shuffleRack() {
@@ -846,6 +972,7 @@ function onPointerMove(e) {
   const dy = e.clientY - drag.startY;
   if (!drag.moved && Math.hypot(dx, dy) > 7) drag.moved = true;
   if (drag.moved && (drag.type === 'rack' || drag.type === 'pending')) {
+    e.preventDefault(); // stop the page scrolling under the drag
     if (!drag.ghost) drag.ghost = makeGhost(drag);
     if (drag.ghost) {
       drag.ghost.style.left = `${e.clientX - 20}px`;
@@ -860,6 +987,7 @@ function onPointerUp(e) {
   const d = drag;
   drag = null;
   if (d.ghost) d.ghost.remove();
+  removeAllGhosts(); // belt-and-suspenders: never leave a ghost behind
   clearDropHighlight();
 
   if (!d.moved) {
@@ -906,6 +1034,7 @@ function makeGhost(d) {
     const p = pending.find((x) => x.row === d.row && x.col === d.col);
     if (p) { letter = p.letter; blank = p.blank; }
   }
+  removeAllGhosts(); // clear any stray ghost before creating a new one
   const g = tileEl(letter, blank, 'ghost');
   document.body.appendChild(g);
   return g;

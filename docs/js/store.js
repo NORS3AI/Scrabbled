@@ -7,12 +7,20 @@ const WALLET_KEY = 'scrabbled.wallet.v1';
 const STATS_KEY = 'scrabbled.stats.v1';
 const SEEN_VERSION_KEY = 'scrabbled.seenVersion';
 const SETTINGS_KEY = 'scrabbled.settings.v1';
-const DEFAULT_SETTINGS = { devPanel: false };
+const DEFAULT_SETTINGS = { devPanel: false, historyOpen: true };
 const ACH_KEY = 'scrabbled.achievements.v1';
 const INV_KEY = 'scrabbled.inventory.v1';
 
 const DEFAULT_WALLET = { coins: 0, gems: 0 };
-const DEFAULT_STATS = { games: 0, wins: 0, losses: 0, bestWord: null, bestWordScore: 0, totalScore: 0 };
+const DEFAULT_STATS = {
+  games: 0, wins: 0, losses: 0, ties: 0,
+  totalGameScore: 0, highestGameScore: 0,
+  moves: 0, words: 0, bingos: 0, swaps: 0, passes: 0,
+  tilesPlayed: 0, blanksPlayed: 0,
+  highestWordScore: 0, highestWord: null,
+  longestWordLen: 0, longestWord: null,
+  letterCounts: {},
+};
 
 function read(key, fallback) {
   try {
@@ -103,15 +111,48 @@ export function addCurrency({ coins = 0, gems = 0 }) {
   return w;
 }
 
-export function recordGame({ won, totalScore = 0, bestWord = null, bestWordScore = 0 }) {
+// Record a finished game (game-level stats).
+export function recordGame({ won = false, tie = false, finalScore = 0 }) {
   const s = getStats();
   s.games += 1;
-  if (won) s.wins += 1; else s.losses += 1;
-  s.totalScore += totalScore;
-  if (bestWordScore > s.bestWordScore) {
-    s.bestWordScore = bestWordScore;
-    s.bestWord = bestWord;
+  if (tie) s.ties += 1; else if (won) s.wins += 1; else s.losses += 1;
+  s.totalGameScore += finalScore;
+  if (finalScore > s.highestGameScore) s.highestGameScore = finalScore;
+  write(STATS_KEY, s);
+  return s;
+}
+
+// Record one human play (per-move and per-letter stats).
+//   words: [string], playScore, bingo, tiles: [{letter, blank}]
+export function recordPlay({ words = [], playScore = 0, bingo = false, tiles = [] }) {
+  const s = getStats();
+  s.moves += 1;
+  s.words += words.length;
+  if (bingo) s.bingos += 1;
+  s.tilesPlayed += tiles.length;
+  for (const t of tiles) {
+    if (t.blank) s.blanksPlayed += 1;
+    const L = String(t.letter || '').toLowerCase();
+    if (L >= 'a' && L <= 'z') s.letterCounts[L] = (s.letterCounts[L] || 0) + 1;
   }
+  if (playScore > s.highestWordScore) {
+    s.highestWordScore = playScore;
+    s.highestWord = (words[0] || '').toUpperCase();
+  }
+  let longest = '';
+  for (const w of words) if (w.length > longest.length) longest = w;
+  if (longest.length > s.longestWordLen) {
+    s.longestWordLen = longest.length;
+    s.longestWord = longest.toUpperCase();
+  }
+  write(STATS_KEY, s);
+  return s;
+}
+
+// Bump a simple counter stat (e.g. swaps, passes).
+export function incStat(key, n = 1) {
+  const s = getStats();
+  s[key] = (s[key] || 0) + n;
   write(STATS_KEY, s);
   return s;
 }

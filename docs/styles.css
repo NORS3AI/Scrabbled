@@ -19,7 +19,10 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
+/* Lock the page: the app sizes itself to the viewport and never scrolls, which
+   also prevents stray drag-ghost artifacts from a scrolling layer. Dialogs
+   scroll internally instead. */
+html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: linear-gradient(160deg, #14352a, #0c241c);
@@ -27,6 +30,7 @@ body {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
+.board, .rack { touch-action: none; }
 .hidden { display: none !important; }
 .muted { color: #6b7a83; }
 .small { font-size: .82rem; }
@@ -38,8 +42,22 @@ body {
   position: sticky; top: 0; z-index: 5;
 }
 .brand { font-weight: 800; font-size: 1.25rem; letter-spacing: .5px; display: flex; align-items: center; gap: .5rem; }
-.wallet { display: flex; align-items: center; gap: .9rem; font-weight: 600; }
+.wallet { display: flex; align-items: center; gap: .6rem; font-weight: 600; flex-wrap: wrap; justify-content: flex-end; }
 .wallet .coin, .wallet .gem { background: rgba(255, 255, 255, .12); padding: .25rem .55rem; border-radius: 20px; font-size: .9rem; }
+.wallet .gem { position: relative; }
+/* Floating "+N" gem reward shown under the gem counter. */
+.gem-gain {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 4px;
+  background: #1f9d55; color: #fff; padding: .1rem .45rem; border-radius: 10px;
+  font-size: .75rem; white-space: nowrap; opacity: 0; pointer-events: none;
+}
+.gem-gain.show { animation: gemfloat 1.7s ease forwards; }
+@keyframes gemfloat {
+  0% { opacity: 0; transform: translate(-50%, -3px); }
+  15% { opacity: 1; transform: translate(-50%, 2px); }
+  80% { opacity: 1; transform: translate(-50%, 2px); }
+  100% { opacity: 0; transform: translate(-50%, -4px); }
+}
 .ver-badge {
   background: rgba(255, 255, 255, .12); color: #fff; border: 1px solid rgba(255, 255, 255, .25);
   padding: .22rem .5rem; border-radius: 20px; font-size: .72rem; font-weight: 600; cursor: pointer;
@@ -71,10 +89,9 @@ body {
 }
 .board-area {
   display: flex; flex-direction: column; align-items: center; gap: .5rem;
-  min-width: 0; min-height: 0; height: 100%;
-  width: 100%; max-width: min(94vw, 520px);
+  min-width: 0; min-height: 0; height: 100%; flex: 1 1 auto;
 }
-.scoreboard { display: flex; gap: .6rem; width: 100%; flex: 0 0 auto; }
+.scoreboard { display: flex; gap: .6rem; width: 100%; max-width: min(94vw, 520px); margin: 0 auto; flex: 0 0 auto; }
 .bag-info { flex: 0 0 auto; }
 .player-card {
   flex: 1; background: var(--paper); border-radius: 10px; padding: .5rem .7rem;
@@ -92,7 +109,7 @@ body {
      (rather than a fixed height guess) keeps the board from overflowing onto
      the dock when the dock grows — e.g. with the dev panel open. */
   flex: 1 1 auto; min-height: 0; aspect-ratio: 1 / 1;
-  width: auto; max-width: 100%; max-height: 100%; margin: 0 auto;
+  width: auto; max-width: min(94vw, 520px); max-height: 100%; margin: 0 auto;
   display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr);
   gap: 2px; background: var(--board-line); padding: 4px; border-radius: 8px; box-shadow: var(--shadow);
 }
@@ -204,6 +221,20 @@ body {
 .shop-card .shop-own { font-size: .75rem; color: #1f6f54; font-weight: 700; }
 .shop-card .shop-buy { white-space: nowrap; }
 
+/* Stats panel */
+.stats-body { text-align: left; max-height: 62vh; overflow-y: auto; margin-top: .6rem; }
+.stats-section { margin-bottom: 1rem; }
+.stats-section h3 { margin: .2rem 0 .5rem; font-size: .95rem; color: #21303b; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .5rem; }
+.stat-cell { background: #f3f1ea; border-radius: 8px; padding: .5rem .6rem; }
+.stat-cell .stat-val { font-size: 1.25rem; font-weight: 800; color: #1f6f54; }
+.stat-cell .stat-label { font-size: .75rem; color: #6b7a83; }
+.letters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)); gap: .3rem; }
+.letter-cell { background: #f3f1ea; border-radius: 6px; padding: .25rem; text-align: center; }
+.letter-cell .lc-letter { font-weight: 800; }
+.letter-cell .lc-count { font-size: .72rem; color: #6b7a83; }
+.letter-cell.hot { background: #d8efe2; }
+
 /* Armed power-up banner in the dock */
 .armed-banner { background: #fff0d6; border: 1px solid var(--accent); border-radius: 8px; padding: .3rem .55rem; font-weight: 700; color: #7a5b12; text-align: center; font-size: .85rem; }
 
@@ -225,16 +256,17 @@ body {
 .message.error { color: #c0392b; }
 .message.ok { color: var(--primary); }
 
-/* History sidebar. Hidden by default and floated out of the centring flow so it
-   never shifts the board off-centre; shown only when there's room beside a
-   centred board (see the min-width rule below). */
+/* History: an in-flow right column on tablet/desktop, collapsible from view.
+   Hidden by default; shown when .app has .history-open (>=820px). */
 .history-wrap {
   display: none;
-  background: var(--paper); border-radius: 12px; padding: .8rem 1rem; box-shadow: var(--shadow);
-  width: 280px; overflow: hidden; flex-direction: column;
+  background: var(--paper); border-radius: 12px; padding: .7rem .9rem; box-shadow: var(--shadow);
+  width: 290px; flex: 0 0 290px; height: 100%; overflow: hidden; flex-direction: column;
+  margin-left: 1rem;
 }
+.history-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .history-wrap h2 { margin: .2rem 0 .6rem; font-size: 1rem; }
-.history { margin: 0; padding-left: 1.2rem; overflow-y: auto; font-size: .9rem; }
+.history { margin: 0; padding-left: 1.2rem; overflow-y: auto; font-size: .9rem; flex: 1 1 auto; }
 .history li { margin-bottom: .35rem; }
 .history .hl-word { font-weight: 700; }
 .history .hl-pts { color: var(--primary); font-weight: 700; }
@@ -273,17 +305,13 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 .thinking { position: fixed; bottom: 172px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, .8); color: #fff; padding: .5rem 1rem; border-radius: 20px; z-index: 15; font-size: .9rem; }
 
-/* Only show the history panel when the viewport is wide enough that it sits
-   beside a viewport-centred board without overlapping it. The board stays
-   centred at every width. */
-@media (min-width: 1240px) {
-  .history-wrap {
-    display: flex; position: absolute; top: .6rem; right: 1.5rem;
-    max-height: calc(100% - .6rem);
-  }
+/* Tablet/desktop: show the history column when toggled open. */
+@media (min-width: 820px) {
+  .app.history-open .history-wrap { display: flex; }
 }
-
-@media (max-width: 900px) {
+/* Hide the history toggle where the column can't be shown. */
+@media (max-width: 819px) {
+  .hist-toggle { display: none; }
   .stage { padding: .5rem .5rem 0; }
 }
 @media (max-width: 480px) {
