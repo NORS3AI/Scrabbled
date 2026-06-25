@@ -2,9 +2,20 @@
 // top entry's version makes the "What's new" dialog pop once for returning
 // players. Keep entries short and player-facing.
 
-export const VERSION = 'v0.0.5-alpha';
+export const VERSION = 'v0.0.6-alpha';
 
 export const PATCH_NOTES = [
+  {
+    version: 'v0.0.6-alpha',
+    date: '2026-06-25',
+    title: 'Resume on refresh & quality-of-life',
+    changes: [
+      'Refreshing the tab now resumes your game in progress instead of starting over — it\'s saved on your device.',
+      'Achievement unlocks no longer pop up in the middle of the screen; the 🏆 button glow-pulses instead while you have rewards to claim.',
+      'The computer\'s most recently played tiles are highlighted gold so you can see what it played and where.',
+      'Dev tools: the +coins/+gems buttons moved into Settings (only the Best-Word tool stays above your tiles), and the dev panel no longer hides when you collapse the history.',
+    ],
+  },
   {
     version: 'v0.0.5-alpha',
     date: '2026-06-25',

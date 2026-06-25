@@ -1,8 +1,8 @@
-// Entry point: load the dictionary, reveal the app, and open the new-game
-// dialog. Everything else is driven by ui.js.
+// Entry point: load the dictionary, reveal the app, and either resume a saved
+// game or open the new-game dialog. Everything else is driven by ui.js.
 
 import { loadDictionary } from './dictionary.js';
-import { startUI, openNewDialog } from './ui.js';
+import { startUI, openNewDialog, resumeOrNew } from './ui.js';
 
 async function boot() {
   try {
@@ -16,7 +16,7 @@ async function boot() {
   document.getElementById('loading').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   startUI();
-  openNewDialog();
+  resumeOrNew(); // resume a saved in-progress game, or open the new-game dialog
 }
 
 document.getElementById('btn-new').addEventListener('click', openNewDialog);

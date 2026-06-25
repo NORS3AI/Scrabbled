@@ -14,6 +14,7 @@ import {
   getAchievements, unlockAchievements, claimAchievement,
   getInventory, buyItem, useItem,
   getThemes, buyTheme, selectTheme,
+  saveGame, loadGame, clearSavedGame,
 } from './store.js';
 import { THEMES, THEME_BY_ID } from './themes.js';
 import {
@@ -36,6 +37,7 @@ let hint = null;            // dev-panel best-word highlight {cells, word, score
 let settings = { devPanel: false, historyOpen: true };
 let achTracker = newTracker();      // per-game achievement accumulator
 let armed = { multiplier: 0, multItem: null, extraTurn: false }; // armed power-ups
+let lastMove = new Set();            // board keys of the tiles the AI just played (gold highlight)
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -79,16 +81,27 @@ function renderThemePicker() {
 }
 
 // ---------- Settings & dev panel ----------
-function applySettings() {
+// Dev panel and history are independent toggles; each has its own apply fn so
+// changing one never affects the other.
+function applyDevPanel() {
   $('dev-panel').classList.toggle('hidden', !settings.devPanel);
+  $('dev-tools').classList.toggle('hidden', !settings.devPanel);
   $('set-dev').checked = !!settings.devPanel;
   if (!settings.devPanel) clearHint();
+}
+
+function applyHistory() {
   document.getElementById('app').classList.toggle('history-open', !!settings.historyOpen);
+}
+
+function applySettings() {
+  applyDevPanel();
+  applyHistory();
 }
 
 function toggleHistory() {
   settings = setSettings({ historyOpen: !settings.historyOpen });
-  applySettings();
+  applyHistory(); // only touches history — leaves the dev panel alone
 }
 
 function openSettings() { applySettings(); renderThemePicker(); $('settings-dialog').classList.remove('hidden'); }
@@ -188,11 +201,52 @@ export function startNewGame(config) {
   selectedRackIndex = null;
   hint = null;
   busy = false;
+  lastMove = new Set();
   achTracker = newTracker();
   armed = { multiplier: 0, multItem: null, extraTurn: false };
   renderArmed();
   render();
+  saveState();
   maybeRunAI();
+}
+
+// Persist the in-progress game so a tab refresh resumes it; clear it when over.
+function saveState() {
+  if (game && game.status === 'active') saveGame(game);
+  else clearSavedGame();
+}
+
+// On load: resume a saved active game if there is one, else open the new-game
+// dialog. Pending (uncommitted) tiles are not saved — they reset on refresh.
+export function resumeOrNew() {
+  const saved = loadGame();
+  if (saved && saved.status === 'active' && Array.isArray(saved.players) && saved.board) {
+    game = saved;
+    pending = [];
+    selectedRackIndex = null;
+    hint = null;
+    busy = false;
+    lastMove = new Set();
+    armed = { multiplier: 0, multItem: null, extraTurn: false };
+    // Rebuild the per-game achievement letter tracker from the human's history.
+    achTracker = newTracker();
+    for (const e of game.history) {
+      if (e.type === 'play' && game.players[e.player] && game.players[e.player].type === 'human') {
+        for (const word of e.words || []) {
+          for (const ch of String(word).toLowerCase()) {
+            if (ch >= 'a' && ch <= 'z') achTracker.letterCounts[ch] = (achTracker.letterCounts[ch] || 0) + 1;
+          }
+        }
+      }
+    }
+    renderArmed();
+    render();
+    message('Resumed your game.', '');
+    if (currentPlayer(game).type === 'ai') maybeRunAI();
+    return true;
+  }
+  openNewDialog();
+  return false;
 }
 
 function buildPlayers(config) {
@@ -256,7 +310,8 @@ function renderBoard() {
       const pend = pendingMap.get(key);
       const ai = aiMap.get(key);
       if (existing) {
-        cell.appendChild(tileEl(existing.letter, existing.blank, 'locked'));
+        // Gold-highlight the tiles the computer just played.
+        cell.appendChild(tileEl(existing.letter, existing.blank, 'locked' + (lastMove.has(key) ? ' lastmove' : '')));
       } else if (ai) {
         // The most recently placed AI tile gets the drop-in animation.
         cell.appendChild(tileEl(ai.letter, ai.blank, key === aiAnimLastKey ? 'locked placing' : 'locked'));
@@ -444,6 +499,7 @@ function commitPlay() {
   pending = [];
   selectedRackIndex = null;
   hint = null;
+  lastMove = new Set(); // clear the computer's gold highlight now that you've moved
   let msg = `You played ${allWords} for ${res.score}${res.bingo ? ' — BINGO!' : ''}`;
   if (usedMult) msg += ` (×${SHOP_BY_ID[usedMult].name.includes('Triple') ? 3 : 2})`;
   if (usedExtra) msg += ' — extra turn!';
@@ -461,6 +517,7 @@ function commitPlay() {
   evalPlayAchievements(human, res);
 
   render();
+  saveState();
   if (checkEnd()) return;
   maybeRunAI();
 }
@@ -479,13 +536,8 @@ function processAchievements(ids) {
   if (!ids || !ids.length) return;
   const fresh = unlockAchievements(ids);
   if (!fresh.length) return; // already-unlocked ids never re-notify (once and done)
+  // No mid-screen announcement — just make the trophy button glow-pulse.
   updateAchBadge();
-  const gems = fresh.reduce((s, id) => s + (ACHIEVEMENT_BY_ID[id] ? ACHIEVEMENT_BY_ID[id].gems : 0), 0);
-  if (fresh.length === 1) {
-    toast(`🏆 Achievement unlocked: ${ACHIEVEMENT_BY_ID[fresh[0]].name} — tap 🏆 to claim 💎${gems}`);
-  } else {
-    toast(`🏆 ${fresh.length} achievements unlocked — tap 🏆 to claim 💎${gems}`);
-  }
 }
 
 function clearArmed() {
@@ -503,6 +555,7 @@ function doPass() {
   incStat('passes');
   passTurn(game);
   render();
+  saveState();
   if (checkEnd()) return;
   maybeRunAI();
 }
@@ -515,6 +568,7 @@ function doSwap(tiles) {
   incStat('swaps');
   message(`Swapped ${tiles.length} tile(s).`, 'ok');
   render();
+  saveState();
   maybeRunAI();
   return true;
 }
@@ -546,6 +600,7 @@ async function maybeRunAI() {
 
   busy = false;
   render();
+  saveState();
   if (!checkEnd()) maybeRunAI(); // in case of consecutive AI players
 }
 
@@ -567,6 +622,8 @@ async function animateAIPlay(player, move) {
   submitPlay(game, move.placement.map((p) => ({ row: p.row, col: p.col, letter: p.letter, blank: p.blank })));
   aiAnim = [];
   aiAnimLastKey = -1;
+  // Mark the just-played tiles gold so the player sees what/where was played.
+  lastMove = new Set(move.placement.map((p) => p.row * BOARD_SIZE + p.col));
   message(`${player.name} played ${w.word.toUpperCase()} for ${move.score}${move.bingo ? ' — BINGO!' : ''}.`, '');
 }
 
@@ -578,6 +635,7 @@ function checkEnd() {
 }
 
 function showEndDialog() {
+  clearSavedGame(); // a finished game shouldn't resume on refresh
   const human = game.players.find((p) => p.type === 'human') || game.players[0];
   const won = game.winner === human.id;
   // Best word this game by the human, for stats.
@@ -656,15 +714,17 @@ function updateAchBadge() {
   let claimable = 0;
   for (const id in a.unlocked) if (!a.claimed[id]) claimable++;
   const b = $('ach-badge');
+  const btn = $('btn-achievements');
   if (claimable > 0) {
     b.textContent = claimable;
     b.classList.remove('hidden');
-    // Pulse to draw attention that something is claimable.
     b.classList.remove('pulse');
     void b.offsetWidth;
     b.classList.add('pulse');
+    btn.classList.add('glow'); // glowing pulse on the trophy button while claimable
   } else {
     b.classList.add('hidden');
+    btn.classList.remove('glow');
   }
 }
 
@@ -924,6 +984,7 @@ function usePowerup(id) {
       selectedRackIndex = null;
       message('Drew a fresh rack.', 'ok');
       render();
+      saveState();
       break;
     }
     case 'freeSwap': {
@@ -1000,8 +1061,8 @@ function bindControls() {
   $('btn-history').addEventListener('click', toggleHistory);
   $('btn-history-collapse').addEventListener('click', toggleHistory);
   $('btn-place-best').addEventListener('click', placeBestWord);
-  // Dev currency buttons (+gems / +coins) via delegation.
-  $('dev-panel').addEventListener('click', (e) => {
+  // Dev currency buttons (+gems / +coins) live in Settings now.
+  $('dev-tools').addEventListener('click', (e) => {
     const gem = e.target.closest('[data-gem]');
     const coin = e.target.closest('[data-coin]');
     if (gem) {
@@ -1219,6 +1280,7 @@ function doFreeSwap(tiles) {
   useItem('freeSwap');
   message(`Free-swapped ${tiles.length} tile(s) — still your turn.`, 'ok');
   render();
+  saveState();
 }
 
 // ---------- New game dialog ----------
